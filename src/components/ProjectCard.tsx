@@ -67,6 +67,7 @@ function ProjectCard({ project, onClick, onDelete }: ProjectCardProps) {
         <div
           className={`h-1.5 rounded-full transition-all ${
             project.status === 'completed' ? 'bg-green-500' :
+            project.status === 'milestone' ? 'bg-purple-500' :
             project.status === 'in_progress' ? 'bg-blue-500' : 'bg-yellow-400'
           }`}
           style={{ width: `${project.progress}%` }}

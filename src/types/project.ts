@@ -1,4 +1,4 @@
-export type ProjectStatus = 'preparation' | 'in_progress' | 'completed'
+export type ProjectStatus = 'preparation' | 'in_progress' | 'completed' | 'milestone'
 
 export type ProjectPriority = 'high' | 'medium' | 'low'
 
@@ -30,6 +30,7 @@ export const STATUS_CONFIG: Record<ProjectStatus, ProjectStatusLabel> = {
   preparation: { key: 'preparation', label: '準備中', color: 'text-yellow-700', bgColor: 'bg-yellow-400' },
   in_progress: { key: 'in_progress', label: '進行中', color: 'text-blue-700', bgColor: 'bg-blue-500' },
   completed:   { key: 'completed',   label: '已完成', color: 'text-green-700', bgColor: 'bg-green-500' },
+  milestone:   { key: 'milestone',   label: '里程碑', color: 'text-purple-700', bgColor: 'bg-purple-500' },
 }
 
 export type PriorityLabel = {

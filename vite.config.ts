@@ -8,8 +8,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        // Disable code splitting - keep everything in one file
-        inlineDynamicImports: true,
+        // Disable code splitting
         codeSplitting: false,
       },
     },

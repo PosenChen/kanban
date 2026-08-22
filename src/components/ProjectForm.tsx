@@ -131,6 +131,7 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects }: ProjectFo
                 <option value="preparation">準備中</option>
                 <option value="in_progress">進行中</option>
                 <option value="completed">已完成</option>
+                <option value="milestone">里程碑</option>
               </select>
             </div>
             <div>

@@ -1,77 +1,61 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
-import { STATUS_CONFIG, type Project } from '@/types/project'
-import { dateToStr, addDays, dateToStr as fmtDate, getDaysDiff, formatMonthDay } from '@/utils/dateUtils'
+import { STATUS_CONFIG, PRIORITY_CONFIG, type Project, type ProjectStatus } from '@/types/project'
+import { dateToStr, addDays, getDaysDiff } from '@/utils/dateUtils'
 
 // ── Constants ──
-const DAY_WIDTH = 48        // wider for daily view readability
-const ROW_HEIGHT = 44
+const DATE_COL_WIDTH = 24 // narrow enough for "31" (2 digits)
+const DAY_WIDTH = 24      // 1 day = 24px
+const ROW_HEIGHT = 48
+const ROW_MIN_HEIGHT = 48 // min height per sub-project group
+const SUBROW_HEIGHT = 20  // height per sub-project within a group
 const SIDEBAR_WIDTH = 200
-const SCROLL_SENSITIVITY = 0.8 // pixels scrolled → pixels moved
 
 // ── Helpers ──
 
-function buildFlatList(projects: Project[]): GanttRow[] {
-  const result: GanttRow[] = []
-  function walk(parentId: string | null, depth: number) {
-    const children = projects.filter(p => p.parent_id === parentId)
-    for (const child of children) {
-      result.push({ project: child, depth })
-      walk(child.id, depth + 1)
-    }
+/** Group projects by parent: root projects get their own row; sub-projects share a row group */
+function buildRowGroups(projects: Project[]): { projectId: string; subProjects: Project[] }[] {
+  const roots = projects.filter(p => p.parent_id === null)
+  const groups: { projectId: string; subProjects: Project[] }[] = []
+  for (const root of roots) {
+    const subs = projects.filter(p => p.parent_id === root.id)
+    groups.push({ projectId: root.id, subProjects: subs })
   }
-  walk(null, 0)
-  return result
+  return groups
 }
 
-/** How many days to show when user scrolls far enough left/right */
-function scrollableDayRange(zoomLevel: 'month' | 'week' | 'day'): number {
-  if (zoomLevel === 'day') return 365 * 2
-  if (zoomLevel === 'week') return 365 * 3
-  return 365 * 10
+/** Get all project IDs that are milestones */
+function milestoneIds(projects: Project[]): Set<string> {
+  return new Set(projects.filter(p => p.status === 'milestone').map(p => p.id))
 }
 
-/** Snap a Date to the start of the week (Monday) */
-function snapToWeekStart(d: Date): Date {
-  const result = new Date(d)
-  result.setDate(result.getDate() - ((result.getDay() + 6) % 7))
-  result.setHours(0, 0, 0, 0)
-  return result
-}
-
-/** Snap a Date to the start of the month */
-function snapToMonthStart(d: Date): Date {
-  const result = new Date(d)
-  result.setDate(1)
-  result.setHours(0, 0, 0, 0)
-  return result
-}
-
-interface GanttRow {
-  project: Project
-  depth: number
+interface DayHeader {
+  dateStr: string
+  dayNum: number
+  month: number
+  year: number
+  isMonthStart: boolean
+  isWeekStart: boolean
+  dayOfWeek: number // 0=Sun, 6=Sat
 }
 
 function GanttPage() {
   const navigate = useNavigate()
   const { projects, add, remove } = useProjects()
-  const flatList = useMemo(() => buildFlatList(projects), [projects])
+  const rowGroups = useMemo(() => buildRowGroups(projects), [projects])
+  const mileIdSet = useMemo(() => milestoneIds(projects), [projects])
 
   // ── View state ──
-  // Default: start at first project's start date or today, zoom = 'day'
   const todayStr = dateToStr(new Date())
   const [zoomLevel, setZoomLevel] = useState<'month' | 'week' | 'day'>('day')
   const [viewStart, setViewStart] = useState(() => {
     const firstDate = projects.length
       ? projects.reduce((min, p) => p.start_date < min ? p.start_date : min, projects[0].start_date)
       : todayStr
-    const d = new Date(firstDate)
-    if (zoomLevel === 'week') return snapToWeekStart(d).toISOString().split('T')[0]
-    if (zoomLevel === 'month') return snapToMonthStart(d).toISOString().split('T')[0]
     return firstDate
   })
-  const [scrollOffset, setScrollOffset] = useState(0) // pixel offset for infinite scroll
+  const [scrollOffset, setScrollOffset] = useState(0)
 
   // ── Filter ──
   const [searchQuery, setSearchQuery] = useState('')
@@ -82,20 +66,32 @@ function GanttPage() {
 
   // ── Filtering ──
   const filteredList = useMemo(() => {
-    let list = flatList
+    let list = projects
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
-      list = list.filter(r =>
-        r.project.name.toLowerCase().includes(q) ||
-        r.project.description.toLowerCase().includes(q) ||
-        r.project.tags.some(t => t.toLowerCase().includes(q))
+      list = list.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q) ||
+        p.tags.some(t => t.toLowerCase().includes(q))
       )
     }
-    if (statusFilter) list = list.filter(r => r.project.status === statusFilter)
-    if (priorityFilter) list = list.filter(r => r.project.priority === priorityFilter)
-    if (selectedTags.length > 0) list = list.filter(r => r.project.tags.some(t => selectedTags.includes(t)))
+    if (statusFilter) list = list.filter(p => p.status === statusFilter)
+    if (priorityFilter) list = list.filter(p => p.priority === priorityFilter)
+    if (selectedTags.length > 0) list = list.filter(p => p.tags.some(t => selectedTags.includes(t)))
     return list
-  }, [flatList, searchQuery, statusFilter, priorityFilter, selectedTags])
+  }, [projects, searchQuery, statusFilter, priorityFilter, selectedTags])
+
+  // Build row groups from filtered projects
+  const filteredGroups = useMemo(() => {
+    const filteredIds = new Set(filteredList.map(p => p.id))
+    const filteredRoots = filteredList.filter(p => p.parent_id === null && filteredIds.has(p.id))
+    const groups: { projectId: string; subProjects: Project[] }[] = []
+    for (const root of filteredRoots) {
+      const subs = filteredList.filter(p => p.parent_id === root.id)
+      groups.push({ projectId: root.id, subProjects: subs })
+    }
+    return groups
+  }, [filteredList])
 
   const allTags = useMemo(() => {
     const tagSet = new Set<string>()
@@ -122,50 +118,43 @@ function GanttPage() {
     setExpandedParents(new Set(rootIds))
   }, [projects])
 
-  // ── View range calculation (infinite scroll) ──
-  const { dateHeaders, viewStartStr, viewEndStr } = useMemo(() => {
+  // ── View range ──
+  const { dateHeaders, viewEndStr } = useMemo(() => {
     const startDate = new Date(viewStart)
     startDate.setHours(0, 0, 0, 0)
-    const range = scrollableDayRange(zoomLevel)
+    // Show enough days for scrolling
+    const range = 730 // 2 years
     const endDate = new Date(startDate)
     endDate.setDate(endDate.getDate() + range)
 
-    const headers: { label: string; dateStr: string; isWeekStart: boolean; isMonthStart: boolean }[] = []
+    const headers: DayHeader[] = []
     const d = new Date(startDate)
 
     while (d <= endDate) {
-      const month = d.getMonth() + 1
-      const day = d.getDate()
-      const dateStr = dateToStr(d)
-      const isWeekStart = zoomLevel === 'day' ? (d.getDay() === 1) : (d.getDate() === 1)
-      const isMonthStart = zoomLevel !== 'day' ? (d.getDate() === 1) : (day === 1)
-
-      let label: string
-      if (zoomLevel === 'day') {
-        label = `${month}/${day}`
-      } else if (zoomLevel === 'week') {
-        label = `${month}/${day}`
-      } else {
-        label = `${month}`
-      }
-
-      headers.push({ label, dateStr, isWeekStart, isMonthStart })
+      const ds = dateToStr(d)
+      headers.push({
+        dateStr: ds,
+        dayNum: d.getDate(),
+        month: d.getMonth() + 1,
+        year: d.getFullYear(),
+        isMonthStart: d.getDate() === 1,
+        isWeekStart: d.getDay() === 1,
+        dayOfWeek: d.getDay(),
+      })
       d.setDate(d.getDate() + 1)
     }
 
     return {
       dateHeaders: headers,
-      viewStartStr: dateToStr(startDate),
       viewEndStr: dateToStr(endDate),
     }
-  }, [viewStart, zoomLevel])
+  }, [viewStart])
 
   const totalWidth = dateHeaders.length * DAY_WIDTH
 
-  // Current day highlight offset
-  const currentDayOffset = useMemo(() => {
-    const today = dateToStr(new Date())
-    const idx = dateHeaders.findIndex(h => h.dateStr === today)
+  // Today offset
+  const todayOffset = useMemo(() => {
+    const idx = dateHeaders.findIndex(h => h.dateStr === todayStr)
     return idx >= 0 ? idx * DAY_WIDTH : 0
   }, [dateHeaders])
 
@@ -174,25 +163,29 @@ function GanttPage() {
     preparation: '#FBBF24',
     in_progress: '#3B82F6',
     completed: '#10B981',
+    milestone: '#A855F7', // purple
   }
 
   // ── Scroll helpers ──
   const handleScrollLeft = useCallback(() => {
-    const daysBack = zoomLevel === 'day' ? 7 : zoomLevel === 'week' ? 14 : 30
-    const newStart = addDays(viewStart, -daysBack)
-    setViewStart(newStart)
+    const daysBack = 30
+    setViewStart(addDays(viewStart, -daysBack))
     setScrollOffset(0)
-  }, [viewStart, zoomLevel])
+  }, [viewStart])
 
   const handleScrollRight = useCallback(() => {
-    const daysForward = zoomLevel === 'day' ? 7 : zoomLevel === 'week' ? 14 : 30
-    const newStart = addDays(viewStart, daysForward)
-    setViewStart(newStart)
+    const daysForward = 30
+    setViewStart(addDays(viewStart, daysForward))
     setScrollOffset(0)
-  }, [viewStart, zoomLevel])
+  }, [viewStart])
 
   const handleScrollToToday = useCallback(() => {
     setViewStart(todayStr)
+    setScrollOffset(0)
+  }, [])
+
+  const handleZoomChange = useCallback((level: 'month' | 'week' | 'day') => {
+    setZoomLevel(level)
     setScrollOffset(0)
   }, [])
 
@@ -205,31 +198,14 @@ function GanttPage() {
     navigate(`/project/${id}`)
   }, [navigate])
 
-  const handleZoomChange = useCallback((level: 'month' | 'week' | 'day') => {
-    setZoomLevel(level)
-    setScrollOffset(0)
-    const d = new Date(viewStart)
-    if (level === 'week') {
-      setViewStart(snapToWeekStart(d).toISOString().split('T')[0])
-    } else if (level === 'month') {
-      setViewStart(snapToMonthStart(d).toISOString().split('T')[0])
-    } else {
-      // day view — snap to nearest 7 days from today if we haven't scrolled yet
-      if (Math.abs(getDaysDiff(viewStart, todayStr)) < 7) {
-        setViewStart(todayStr)
-      }
-    }
-  }, [viewStart, todayStr])
-
   const handleAdd = useCallback(() => {
     const now = new Date().toISOString().split('T')[0]
-    const next = addDays(now, 7)
     add({
       name: '新專案',
       description: '',
       parent_id: null,
       start_date: now,
-      end_date: next,
+      end_date: dateToStr(new Date(new Date(now).getTime() + 7 * 86400000)),
       status: 'preparation',
       priority: 'medium',
       tags: [],
@@ -243,52 +219,204 @@ function GanttPage() {
     }
   }, [remove])
 
-  // ── Render gantt bar ──
-  const renderBar = (row: GanttRow) => {
-    const startMs = new Date(row.project.start_date).getTime()
-    const endMs = new Date(row.project.end_date).getTime()
+  // ── Render a single gantt bar ──
+  const renderBar = (project: Project, yPos: number, groupHeight: number, barHeight: number) => {
+    const startMs = new Date(project.start_date).getTime()
+    const endMs = new Date(project.end_date).getTime()
     const viewStartMs = new Date(viewStart).getTime()
-    const viewEndMs = new Date(viewEndStr) ? new Date(viewEndStr).getTime() : viewStartMs + 90 * 86400000
+    const viewEndMs = new Date(viewEndStr).getTime()
 
     if (endMs < viewStartMs || startMs > viewEndMs) return null
 
     const offsetDays = Math.max(0, (startMs - viewStartMs) / 86400000)
     const barDays = Math.min((endMs - viewStartMs), (viewEndMs - viewStartMs)) / 86400000
+    const barWidth = Math.max(barDays * DAY_WIDTH, DAY_WIDTH) // at least 1 day width
+    const x = offsetDays * DAY_WIDTH
 
+    // Milestone is a single point — show as an arrow (L-shape)
+    if (project.status === 'milestone') {
+      return (
+        <g key={`bar-${project.id}`}>
+          {/* Arrow symbol (right-angle) at the milestone date */}
+          <path
+            d={`M ${x} ${yPos + 4} L ${x} ${yPos + barHeight - 2} L ${x + 8} ${yPos + barHeight - 2}`}
+            fill="none"
+            stroke={statusColorMap[project.status] || '#A855F7'}
+            strokeWidth={2}
+          />
+          {/* Tooltip */}
+          <foreignObject x={x + 10} y={yPos} width={160} height={barHeight}>
+            <div className="text-xs text-gray-600 truncate">
+              {project.name}
+            </div>
+          </foreignObject>
+        </g>
+      )
+    }
+
+    // Regular bar
     return (
-      <foreignObject
-        x={offsetDays * DAY_WIDTH + 6}
-        y={14}
-        width={Math.max(barDays * DAY_WIDTH - 12, 4)}
-        height={ROW_HEIGHT - 18}
-      >
-        <div
-          className={`h-full rounded flex items-center px-1.5 cursor-pointer group transition-all hover:shadow-md ${
-            row.project.status === 'completed' ? 'opacity-60' : ''
-          }`}
-          style={{
-            backgroundColor: statusColorMap[row.project.status] + 'DD',
-            minWidth: '4px',
-          }}
-          onClick={() => handleProjectClick(row.project.id)}
-          title={`${row.project.name}\n${row.project.start_date} ~ ${row.project.end_date}\n進度: ${row.project.progress}%`}
-        >
-          {(barDays * DAY_WIDTH - 12) > 40 && (
-            <span className="text-white text-xs truncate font-medium drop-shadow">
-              {row.project.name}
-            </span>
-          )}
-        </div>
-      </foreignObject>
+      <rect
+        key={`bar-${project.id}`}
+        x={x}
+        y={yPos + 2}
+        width={barWidth}
+        height={barHeight - 4}
+        rx={3}
+        ry={3}
+        fill={statusColorMap[project.status] || '#3B82F6'}
+        className="cursor-pointer hover:opacity-90 transition-opacity"
+        onClick={() => handleProjectClick(project.id)}
+      />
     )
   }
 
-  // ── Date click map for SVG cells ──
-  const dateClickMap = dateHeaders.map((h, i) => ({
-    dateStr: h.dateStr,
-    x: i * DAY_WIDTH,
-    width: DAY_WIDTH,
-  }))
+  // ── Render date headers ──
+  const renderDateHeaders = (headerHeight: number) => (
+    <g>
+      {/* Background */}
+      <rect x={0} y={0} width={totalWidth} height={headerHeight} fill="#f9fafb" />
+
+      {dateHeaders.map((h, i) => {
+        const xPos = i * DAY_WIDTH
+        const isWeekend = h.dayOfWeek === 0 || h.dayOfWeek === 6
+
+        return (
+          <g key={i}>
+            {/* Column background */}
+            <rect
+              x={xPos}
+              y={0}
+              width={DAY_WIDTH}
+              height={headerHeight}
+              fill={isWeekend ? '#f3f4f6' : (i % 2 === 0 ? '#fff' : 'transparent')}
+            />
+
+            {/* Vertical grid line */}
+            <line
+              x1={xPos}
+              y1={0}
+              x2={xPos}
+              y2={headerHeight}
+              stroke={h.isMonthStart ? '#d1d5db' : '#e5e7eb'}
+              strokeWidth={h.isMonthStart ? 1.5 : 0.5}
+            />
+
+            {/* Month label (first day of month) */}
+            {h.isMonthStart && (
+              <text
+                x={xPos}
+                y={headerHeight - 6}
+                textAnchor="start"
+                className="fill-blue-600 font-bold"
+                fontSize="9"
+              >
+                {h.month}月
+              </text>
+            )}
+
+            {/* Day number on month start (larger) */}
+            {h.isMonthStart && (
+              <text
+                x={xPos + DAY_WIDTH / 2}
+                y={12}
+                textAnchor="middle"
+                className="fill-gray-800 font-bold"
+                fontSize="10"
+              >
+                {h.dayNum}
+              </text>
+            )}
+
+            {/* Week start label in day view */}
+            {zoomLevel === 'day' && h.isWeekStart && (
+              <text
+                x={xPos}
+                y={headerHeight - 14}
+                textAnchor="start"
+                className="fill-gray-500"
+                fontSize="8"
+              >
+                {'一二三四五六日'[h.dayOfWeek]}
+              </text>
+            )}
+
+            {/* Day number for all days in day view (small) */}
+            {zoomLevel === 'day' && !h.isMonthStart && (
+              <text
+                x={xPos + DAY_WIDTH / 2}
+                y={14}
+                textAnchor="middle"
+                className="fill-gray-600"
+                fontSize="8"
+              >
+                {h.dayNum}
+              </text>
+            )}
+
+            {/* Day number in week/month view (only on month start) */}
+            {zoomLevel !== 'day' && h.isMonthStart && (
+              <text
+                x={xPos + DAY_WIDTH / 2}
+                y={headerHeight - 6}
+                textAnchor="end"
+                className="fill-gray-400"
+                fontSize="7"
+              >
+                {h.dayNum}
+              </text>
+            )}
+
+            {/* Week label (every 7 days in day view, labeled by weekday) */}
+            {zoomLevel === 'day' && h.isWeekStart && (
+              <text
+                x={xPos + DAY_WIDTH / 2}
+                y={10}
+                textAnchor="middle"
+                className="fill-gray-500"
+                fontSize="7"
+              >
+                {'一二三四五六日'[h.dayOfWeek]}
+              </text>
+            )}
+          </g>
+        )
+      })}
+
+      {/* Clickable date cells */}
+      {dateHeaders.map((h, i) => (
+        <rect
+          key={`click-${i}`}
+          x={i * DAY_WIDTH}
+          y={0}
+          width={DAY_WIDTH}
+          height={headerHeight}
+          fill="transparent"
+          onClick={() => handleDateClick(h.dateStr)}
+          className="cursor-pointer"
+        />
+      ))}
+
+      {/* Today vertical line */}
+      <line
+        x1={todayOffset}
+        y1={headerHeight}
+        x2={todayOffset}
+        y2={rowGroups.length * ROW_MIN_HEIGHT + headerHeight}
+        stroke="#ef4444"
+        strokeWidth={1.5}
+        strokeDasharray="4 2"
+      />
+    </g>
+  )
+
+  const headerHeight = 28
+
+  // ── Calculate total rows ──
+  // Each root project gets its own row (ROW_MIN_HEIGHT tall)
+  // Sub-projects within the same root share the same row area with subrows
+  const totalRows = filteredGroups.length
+  const totalGanttHeight = Math.max(totalRows * ROW_MIN_HEIGHT, 200)
 
   return (
     <div className="space-y-3">
@@ -318,6 +446,7 @@ function GanttPage() {
               <option value="preparation">準備中</option>
               <option value="in_progress">進行中</option>
               <option value="completed">已完成</option>
+              <option value="milestone">里程碑</option>
             </select>
             <select
               value={priorityFilter}
@@ -365,6 +494,7 @@ function GanttPage() {
             <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-yellow-400"></span>準備中</span>
             <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-blue-500"></span>進行中</span>
             <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-green-500"></span>已完成</span>
+            <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-purple-500"></span>里程碑</span>
           </div>
         </div>
       </div>
@@ -378,7 +508,7 @@ function GanttPage() {
             <button
               onClick={handleScrollLeft}
               className="p-1 text-gray-500 hover:text-blue-500 hover:bg-gray-200 rounded transition-colors"
-              title="往左 scroll（往前）"
+              title="往前（左）"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -387,7 +517,7 @@ function GanttPage() {
             <button
               onClick={handleScrollRight}
               className="p-1 text-gray-500 hover:text-blue-500 hover:bg-gray-200 rounded transition-colors"
-              title="往右 scroll（往後）"
+              title="往後（右）"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -422,189 +552,166 @@ function GanttPage() {
         <div className="overflow-x-auto">
           <svg
             width={totalWidth}
-            height={Math.max(flatList.length * ROW_HEIGHT, 300)}
+            height={totalGanttHeight + headerHeight}
           >
-            {/* Date header */}
-            {dateHeaders.map((h, i) => {
-              const xPos = i * DAY_WIDTH
-              // Show month label on month-start and week-start headers
-              const showMonthLabel = h.isMonthStart
-              const showWeekLabel = zoomLevel === 'day' && h.isWeekStart
+            {/* Date headers */}
+            {renderDateHeaders(headerHeight)}
+
+            {/* Root project rows */}
+            {filteredGroups.map((group, rowIdx) => {
+              const rootProject = projects.find(p => p.id === group.projectId)
+              if (!rootProject) return null
+              const yPos = headerHeight + rowIdx * ROW_MIN_HEIGHT
+
+              // Sub-project count (excluding root)
+              const subCount = group.subProjects.length
 
               return (
-                <g key={i}>
-                  {/* Column background with alternating weekend shading */}
+                <g key={group.projectId}>
+                  {/* Row background */}
                   <rect
-                    x={xPos}
-                    y={0}
-                    width={DAY_WIDTH}
-                    height={30}
-                    fill={
-                      ((new Date(h.dateStr).getDay() === 0 || new Date(h.dateStr).getDay() === 6)
-                        ? '#f9fafb'
-                        : (i % 4 === 0 ? '#fff' : 'transparent'))
+                    x={0}
+                    y={yPos}
+                    width={totalWidth}
+                    height={ROW_MIN_HEIGHT}
+                    fill={rowIdx % 2 === 0 ? '#fff' : '#f9fafb'}
+                  />
+
+                  {/* Sidebar label (root project name) */}
+                  <g
+                    onClick={() => handleProjectClick(group.projectId)}
+                    className="cursor-pointer"
+                  >
+                    <rect
+                      x={0}
+                      y={yPos}
+                      width={SIDEBAR_WIDTH}
+                      height={ROW_MIN_HEIGHT}
+                      fill="transparent"
+                    />
+                    {/* Root project row indicator (left border) */}
+                    <rect
+                      x={0}
+                      y={yPos}
+                      width={2}
+                      height={ROW_MIN_HEIGHT}
+                      fill={rowIdx % 2 === 0 ? '#3B82F6' : '#10B981'}
+                    />
+                    <text
+                      x={6}
+                      y={yPos + ROW_MIN_HEIGHT / 2 + 4}
+                      className="fill-gray-800 font-medium"
+                      fontSize="12"
+                    >
+                      {rootProject.name}
+                    </text>
+                    {/* Status dot */}
+                    <circle
+                      cx={SIDEBAR_WIDTH - 10}
+                      cy={yPos + 10}
+                      r={4}
+                      fill={statusColorMap[rootProject.status] || '#3B82F6'}
+                    />
+                    {/* Delete button */}
+                    <g
+                      className="cursor-pointer"
+                      opacity={0.3}
+                      onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                      onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.3')}
+                      onClick={(e) => { e.stopPropagation(); handleDelete(rootProject.id) }}
+                    >
+                      <circle
+                        cx={SIDEBAR_WIDTH - 10}
+                        cy={yPos + ROW_MIN_HEIGHT - 8}
+                        r={6}
+                        fill="none"
+                        stroke="#d1d5db"
+                        strokeWidth={1}
+                      />
+                      <text
+                        x={SIDEBAR_WIDTH - 10}
+                        y={yPos + ROW_MIN_HEIGHT - 4}
+                        textAnchor="middle"
+                        className="fill-gray-400 hover:fill-red-500 cursor-pointer"
+                        fontSize={8}
+                      >
+                        ×
+                      </text>
+                    </g>
+                  </g>
+
+                  {/* Sub-project rows (if any) */}
+                  {subCount > 0 && (() => {
+                    // Calculate the sub-area within this root row
+                    const subAreaTop = yPos + 4
+                    const subAreaBottom = yPos + ROW_MIN_HEIGHT - 4
+                    const subAreaHeight = subAreaBottom - subAreaTop
+                    const subRowH = Math.min(SUBROW_HEIGHT, subAreaHeight / subCount)
+                    const totalSubHeight = subRowH * subCount
+
+                    // For each sub-project, compute its y position
+                    const subBars: React.ReactNode[] = []
+                    for (let i = 0; i < group.subProjects.length; i++) {
+                      const sub = group.subProjects[i]
+                      const subY = subAreaTop + i * subRowH
+
+                      // Sub-project name label
+                      subBars.push(
+                        <text
+                          key={`sublabel-${sub.id}`}
+                          x={SIDEBAR_WIDTH + 4}
+                          y={subY + subRowH / 2 + 3}
+                          className="fill-gray-600"
+                          fontSize="10"
+                        >
+                          ↳ {sub.name}
+                        </text>
+                      )
+
+                      // Sub-project bar
+                      subBars.push(
+                        renderBar(sub, subY, subRowH, Math.max(subRowH - 2, 8))
+                      )
                     }
-                  />
-                  {/* Vertical grid line */}
-                  <line
-                    x1={xPos}
-                    y1={0}
-                    x2={xPos}
-                    y2={30}
-                    stroke="#e5e7eb"
-                    strokeWidth={h.isMonthStart ? 1.5 : 0.5}
-                  />
-                  {/* Month label (large, at month start) */}
-                  {showMonthLabel && (
-                    <text
-                      x={xPos}
-                      y={20}
-                      textAnchor="start"
-                      className="fill-blue-600"
-                      fontSize="10"
-                      fontWeight="bold"
-                    >
-                      {`${new Date(h.dateStr).toLocaleDateString('zh-TW', { year: '2-digit' })}年${new Date(h.dateStr).toLocaleDateString('zh-TW', { month: 'short' })}`}
-                    </text>
-                  )}
-                  {/* Week label in day view */}
-                  {showWeekLabel && (
-                    <text
-                      x={xPos}
-                      y={28}
-                      textAnchor="start"
-                      className="fill-gray-500"
-                      fontSize="8"
-                    >
-                      {'日一二三四五六'[new Date(h.dateStr).getDay()]}
-                    </text>
-                  )}
-                  {/* Day number (only on month start or every week in week view) */}
-                  {(h.isMonthStart || (zoomLevel === 'week' && i % 4 === 0)) && (
-                    <text
-                      x={xPos + DAY_WIDTH / 2}
-                      y={12}
-                      textAnchor="middle"
-                      className="fill-gray-700"
-                      fontSize="9"
-                      fontWeight={zoomLevel === 'day' ? 'normal' : 'bold'}
-                    >
-                      {new Date(h.dateStr).getDate()}
-                    </text>
-                  )}
+
+                    return (
+                      <g key={`subs-${group.projectId}`}>
+                        {/* Sub-project area background */}
+                        <rect
+                          x={SIDEBAR_WIDTH}
+                          y={subAreaTop}
+                          width={totalWidth - SIDEBAR_WIDTH}
+                          height={totalSubHeight}
+                          fill="#f9fafb"
+                        />
+                        {/* Sub-project horizontal dividers */}
+                        {group.subProjects.map((_, i) => (
+                          <line
+                            key={`divider-${i}`}
+                            x1={SIDEBAR_WIDTH}
+                            y1={subAreaTop + i * subRowH + subRowH}
+                            x2={totalWidth}
+                            y2={subAreaTop + i * subRowH + subRowH}
+                            stroke="#e5e7eb"
+                            strokeWidth={0.5}
+                          />
+                        ))}
+                        {subBars}
+                      </g>
+                    )
+                  })()}
+
+                  {/* Root project bar */}
+                  {renderBar(rootProject, yPos + 6, ROW_MIN_HEIGHT - 12, ROW_MIN_HEIGHT - 16)}
                 </g>
               )
             })}
-
-            {/* Clickable date cells */}
-            {dateClickMap.map((cell, i) => (
-              <rect
-                key={`click-${i}`}
-                x={cell.x}
-                y={0}
-                width={cell.width}
-                height={30}
-                fill="transparent"
-                onClick={() => handleDateClick(cell.dateStr)}
-                className="cursor-pointer"
-              />
-            ))}
-
-            {/* Today vertical line */}
-            <line
-              x1={currentDayOffset}
-              y1={0}
-              x2={currentDayOffset}
-              y2={flatList.length * ROW_HEIGHT}
-              stroke="#ef4444"
-              strokeWidth={2}
-              strokeDasharray="4 2"
-            />
-
-            {/* Rows */}
-            {filteredList.map((row, idx) => (
-              <g key={row.project.id}>
-                {/* Row background */}
-                <rect
-                  x={0}
-                  y={30 + idx * ROW_HEIGHT}
-                  width={totalWidth}
-                  height={ROW_HEIGHT}
-                  fill={idx % 2 === 0 ? '#fff' : '#f9fafb'}
-                />
-                {/* Vertical grid lines */}
-                {dateHeaders.map((h, di) => (
-                  <line
-                    key={`grid-${idx}-${di}`}
-                    x1={di * DAY_WIDTH}
-                    y1={30 + idx * ROW_HEIGHT}
-                    x2={di * DAY_WIDTH}
-                    y2={30 + (idx + 1) * ROW_HEIGHT}
-                    stroke="#f3f4f6"
-                    strokeWidth={0.5}
-                  />
-                ))}
-                {/* Sidebar label */}
-                <g
-                  onClick={() => handleProjectClick(row.project.id)}
-                  className="cursor-pointer"
-                >
-                  <text
-                    x={SIDEBAR_WIDTH - 8}
-                    y={30 + idx * ROW_HEIGHT + 24}
-                    className="fill-gray-700"
-                    fontSize="11"
-                  >
-                    {'\u00A0'.repeat(row.depth * 2)}
-                    {row.depth > 0 ? '↳ ' : ''}{row.project.name}
-                  </text>
-                  {/* Status dot */}
-                  <circle
-                    cx={SIDEBAR_WIDTH - 8}
-                    cy={30 + idx * ROW_HEIGHT + 6}
-                    r={4}
-                    fill={statusColorMap[row.project.status]}
-                  />
-                </g>
-                {/* Gantt bar */}
-                {renderBar(row)}
-                {/* Delete button (appears on hover) */}
-                <g
-                  className="cursor-pointer"
-                  opacity={0.3}
-                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-                  onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.3')}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDelete(row.project.id)
-                  }}
-                >
-                  <circle
-                    cx={SIDEBAR_WIDTH - 8}
-                    cy={30 + idx * ROW_HEIGHT + ROW_HEIGHT - 8}
-                    r={6}
-                    fill="none"
-                    stroke="#d1d5db"
-                    strokeWidth={1}
-                  />
-                  <text
-                    x={SIDEBAR_WIDTH - 8}
-                    y={30 + idx * ROW_HEIGHT + ROW_HEIGHT - 4}
-                    textAnchor="middle"
-                    className="fill-gray-400 hover:fill-red-500 cursor-pointer"
-                    fontSize={8}
-                  >
-                    ×
-                  </text>
-                </g>
-              </g>
-            ))}
           </svg>
         </div>
 
         {/* Info bar */}
         <div className="px-4 py-2 bg-blue-50 border-t border-blue-200 text-xs text-blue-700">
-          💡 直接拖拉 SVG 或按左右箭頭瀏覽時間軸 · 點擊日期進入日曆視圖 · 點擊專案進入詳細頁面
+          💡 箭頭左右按鈕瀏覽時間軸 · 點擊日期進入日曆視圖 · 點擊專案進入詳細頁面 · 紫色箭頭 = 里程碑
         </div>
       </div>
     </div>
