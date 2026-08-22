@@ -3,8 +3,9 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
 
-// Very early console log to verify bundle execution
-console.log('DEBUG-BUNDLE-START: main.tsx module executing')
+// IMMEDIATE visual indicator - executes at module load time
+console.log('🚀 DEBUG-BUNDLE-START: main.tsx module executing')
+document.body.style.backgroundColor = '#fef3c7'  // Yellow background = module loaded
 
 // Pre-render a loading indicator
 const rootEl = document.getElementById('root')
