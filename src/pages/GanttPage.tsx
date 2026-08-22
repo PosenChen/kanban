@@ -4,18 +4,16 @@ import { useProjects } from '@/hooks/useProjects'
 import { STATUS_CONFIG, type Project } from '@/types/project'
 import { dateToStr, addDays, dateToStr as fmtDate, getDaysDiff, formatMonthDay } from '@/utils/dateUtils'
 
-interface GanttRow {
-  project: Project
-  depth: number
-}
-
-const DAY_WIDTH = 28
+// ── Constants ──
+const DAY_WIDTH = 48        // wider for daily view readability
 const ROW_HEIGHT = 44
 const SIDEBAR_WIDTH = 200
+const SCROLL_SENSITIVITY = 0.8 // pixels scrolled → pixels moved
+
+// ── Helpers ──
 
 function buildFlatList(projects: Project[]): GanttRow[] {
   const result: GanttRow[] = []
-
   function walk(parentId: string | null, depth: number) {
     const children = projects.filter(p => p.parent_id === parentId)
     for (const child of children) {
@@ -23,9 +21,36 @@ function buildFlatList(projects: Project[]): GanttRow[] {
       walk(child.id, depth + 1)
     }
   }
-
   walk(null, 0)
   return result
+}
+
+/** How many days to show when user scrolls far enough left/right */
+function scrollableDayRange(zoomLevel: 'month' | 'week' | 'day'): number {
+  if (zoomLevel === 'day') return 365 * 2
+  if (zoomLevel === 'week') return 365 * 3
+  return 365 * 10
+}
+
+/** Snap a Date to the start of the week (Monday) */
+function snapToWeekStart(d: Date): Date {
+  const result = new Date(d)
+  result.setDate(result.getDate() - ((result.getDay() + 6) % 7))
+  result.setHours(0, 0, 0, 0)
+  return result
+}
+
+/** Snap a Date to the start of the month */
+function snapToMonthStart(d: Date): Date {
+  const result = new Date(d)
+  result.setDate(1)
+  result.setHours(0, 0, 0, 0)
+  return result
+}
+
+interface GanttRow {
+  project: Project
+  depth: number
 }
 
 function GanttPage() {
@@ -33,27 +58,31 @@ function GanttPage() {
   const { projects, add, remove } = useProjects()
   const flatList = useMemo(() => buildFlatList(projects), [projects])
 
-  // View state
+  // ── View state ──
+  // Default: start at first project's start date or today, zoom = 'day'
+  const todayStr = dateToStr(new Date())
+  const [zoomLevel, setZoomLevel] = useState<'month' | 'week' | 'day'>('day')
   const [viewStart, setViewStart] = useState(() => {
-    const d = new Date()
-    d.setDate(1)
-    return d
+    const firstDate = projects.length
+      ? projects.reduce((min, p) => p.start_date < min ? p.start_date : min, projects[0].start_date)
+      : todayStr
+    const d = new Date(firstDate)
+    if (zoomLevel === 'week') return snapToWeekStart(d).toISOString().split('T')[0]
+    if (zoomLevel === 'month') return snapToMonthStart(d).toISOString().split('T')[0]
+    return firstDate
   })
-  const [zoomLevel, setZoomLevel] = useState<'month' | 'week' | 'day'>('month')
+  const [scrollOffset, setScrollOffset] = useState(0) // pixel offset for infinite scroll
 
-  // Filter
+  // ── Filter ──
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
-
-  // Expand state
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set())
 
-  // Filtering
+  // ── Filtering ──
   const filteredList = useMemo(() => {
     let list = flatList
-
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       list = list.filter(r =>
@@ -65,7 +94,6 @@ function GanttPage() {
     if (statusFilter) list = list.filter(r => r.project.status === statusFilter)
     if (priorityFilter) list = list.filter(r => r.project.priority === priorityFilter)
     if (selectedTags.length > 0) list = list.filter(r => r.project.tags.some(t => selectedTags.includes(t)))
-
     return list
   }, [flatList, searchQuery, statusFilter, priorityFilter, selectedTags])
 
@@ -76,9 +104,7 @@ function GanttPage() {
   }, [projects])
 
   const toggleTag = useCallback((tag: string) => {
-    setSelectedTags(prev =>
-      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-    )
+    setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
   }, [])
 
   const toggleExpand = useCallback((parentId: string) => {
@@ -96,44 +122,81 @@ function GanttPage() {
     setExpandedParents(new Set(rootIds))
   }, [projects])
 
-  // View range
-  const viewEnd = useMemo(() => {
-    const end = new Date(viewStart)
-    if (zoomLevel === 'day') end.setDate(end.getDate() + 90)
-    else if (zoomLevel === 'week') end.setMonth(end.getMonth() + 3)
-    else end.setFullYear(end.getFullYear() + 1)
-    return end
-  }, [viewStart, zoomLevel])
+  // ── View range calculation (infinite scroll) ──
+  const { dateHeaders, viewStartStr, viewEndStr } = useMemo(() => {
+    const startDate = new Date(viewStart)
+    startDate.setHours(0, 0, 0, 0)
+    const range = scrollableDayRange(zoomLevel)
+    const endDate = new Date(startDate)
+    endDate.setDate(endDate.getDate() + range)
 
-  // Generate date headers
-  const dateHeaders = useMemo(() => {
-    const headers: { label: string; dateStr: string }[] = []
-    const d = new Date(viewStart)
-    const endDate = new Date(viewEnd)
-    // Snap to first day of month if month/week view
-    if (zoomLevel !== 'day') d.setDate(1)
+    const headers: { label: string; dateStr: string; isWeekStart: boolean; isMonthStart: boolean }[] = []
+    const d = new Date(startDate)
 
     while (d <= endDate) {
-      headers.push({
-        label: zoomLevel === 'day' ? String(d.getDate()) : String(d.getMonth() + 1),
-        dateStr: dateToStr(d),
-      })
-      if (zoomLevel === 'day') d.setDate(d.getDate() + 1)
-      else if (zoomLevel === 'week') d.setDate(d.getDate() + 7)
-      else d.setMonth(d.getMonth() + 1)
+      const month = d.getMonth() + 1
+      const day = d.getDate()
+      const dateStr = dateToStr(d)
+      const isWeekStart = zoomLevel === 'day' ? (d.getDay() === 1) : (d.getDate() === 1)
+      const isMonthStart = zoomLevel !== 'day' ? (d.getDate() === 1) : (day === 1)
+
+      let label: string
+      if (zoomLevel === 'day') {
+        label = `${month}/${day}`
+      } else if (zoomLevel === 'week') {
+        label = `${month}/${day}`
+      } else {
+        label = `${month}`
+      }
+
+      headers.push({ label, dateStr, isWeekStart, isMonthStart })
+      d.setDate(d.getDate() + 1)
     }
-    return headers
-  }, [viewStart, viewEnd, zoomLevel])
+
+    return {
+      dateHeaders: headers,
+      viewStartStr: dateToStr(startDate),
+      viewEndStr: dateToStr(endDate),
+    }
+  }, [viewStart, zoomLevel])
 
   const totalWidth = dateHeaders.length * DAY_WIDTH
 
-  // Color map
+  // Current day highlight offset
+  const currentDayOffset = useMemo(() => {
+    const today = dateToStr(new Date())
+    const idx = dateHeaders.findIndex(h => h.dateStr === today)
+    return idx >= 0 ? idx * DAY_WIDTH : 0
+  }, [dateHeaders])
+
+  // ── Status color ──
   const statusColorMap: Record<string, string> = {
     preparation: '#FBBF24',
     in_progress: '#3B82F6',
     completed: '#10B981',
   }
 
+  // ── Scroll helpers ──
+  const handleScrollLeft = useCallback(() => {
+    const daysBack = zoomLevel === 'day' ? 7 : zoomLevel === 'week' ? 14 : 30
+    const newStart = addDays(viewStart, -daysBack)
+    setViewStart(newStart)
+    setScrollOffset(0)
+  }, [viewStart, zoomLevel])
+
+  const handleScrollRight = useCallback(() => {
+    const daysForward = zoomLevel === 'day' ? 7 : zoomLevel === 'week' ? 14 : 30
+    const newStart = addDays(viewStart, daysForward)
+    setViewStart(newStart)
+    setScrollOffset(0)
+  }, [viewStart, zoomLevel])
+
+  const handleScrollToToday = useCallback(() => {
+    setViewStart(todayStr)
+    setScrollOffset(0)
+  }, [])
+
+  // ── Handlers ──
   const handleDateClick = useCallback((dateStr: string) => {
     navigate(`/daily/${dateStr}`)
   }, [navigate])
@@ -141,6 +204,22 @@ function GanttPage() {
   const handleProjectClick = useCallback((id: string) => {
     navigate(`/project/${id}`)
   }, [navigate])
+
+  const handleZoomChange = useCallback((level: 'month' | 'week' | 'day') => {
+    setZoomLevel(level)
+    setScrollOffset(0)
+    const d = new Date(viewStart)
+    if (level === 'week') {
+      setViewStart(snapToWeekStart(d).toISOString().split('T')[0])
+    } else if (level === 'month') {
+      setViewStart(snapToMonthStart(d).toISOString().split('T')[0])
+    } else {
+      // day view — snap to nearest 7 days from today if we haven't scrolled yet
+      if (Math.abs(getDaysDiff(viewStart, todayStr)) < 7) {
+        setViewStart(todayStr)
+      }
+    }
+  }, [viewStart, todayStr])
 
   const handleAdd = useCallback(() => {
     const now = new Date().toISOString().split('T')[0]
@@ -164,41 +243,37 @@ function GanttPage() {
     }
   }, [remove])
 
-  const allProjectsForDropdown = useMemo(() => projects.filter(p => p.parent_id === null), [projects])
-
-  // Render gantt bar for a single row
+  // ── Render gantt bar ──
   const renderBar = (row: GanttRow) => {
     const startMs = new Date(row.project.start_date).getTime()
     const endMs = new Date(row.project.end_date).getTime()
     const viewStartMs = new Date(viewStart).getTime()
-    const viewEndMs = new Date(viewEnd).getTime()
+    const viewEndMs = new Date(viewEndStr) ? new Date(viewEndStr).getTime() : viewStartMs + 90 * 86400000
 
     if (endMs < viewStartMs || startMs > viewEndMs) return null
 
-    const offsetMs = Math.max(0, startMs - viewStartMs)
-    const barLenMs = Math.min(endMs, viewEndMs) - Math.max(startMs, viewStartMs)
-    const offset = offsetMs / (1000 * 60 * 60 * 24)
-    const width = barLenMs / (1000 * 60 * 60 * 24)
+    const offsetDays = Math.max(0, (startMs - viewStartMs) / 86400000)
+    const barDays = Math.min((endMs - viewStartMs), (viewEndMs - viewStartMs)) / 86400000
 
     return (
       <foreignObject
-        x={offset}
-        y={0}
-        width={Math.max(width, 4)}
-        height={ROW_HEIGHT - 4}
+        x={offsetDays * DAY_WIDTH + 6}
+        y={14}
+        width={Math.max(barDays * DAY_WIDTH - 12, 4)}
+        height={ROW_HEIGHT - 18}
       >
         <div
-          className={`h-full rounded flex items-center px-1.5 cursor-pointer group ${
+          className={`h-full rounded flex items-center px-1.5 cursor-pointer group transition-all hover:shadow-md ${
             row.project.status === 'completed' ? 'opacity-60' : ''
           }`}
           style={{
-            backgroundColor: statusColorMap[row.project.status] + 'CC',
+            backgroundColor: statusColorMap[row.project.status] + 'DD',
             minWidth: '4px',
           }}
           onClick={() => handleProjectClick(row.project.id)}
-          title={`${row.project.name} (${row.project.start_date} ~ ${row.project.end_date})`}
+          title={`${row.project.name}\n${row.project.start_date} ~ ${row.project.end_date}\n進度: ${row.project.progress}%`}
         >
-          {width > 20 && (
+          {(barDays * DAY_WIDTH - 12) > 40 && (
             <span className="text-white text-xs truncate font-medium drop-shadow">
               {row.project.name}
             </span>
@@ -208,7 +283,7 @@ function GanttPage() {
     )
   }
 
-  // Build date click map for SVG
+  // ── Date click map for SVG cells ──
   const dateClickMap = dateHeaders.map((h, i) => ({
     dateStr: h.dateStr,
     x: i * DAY_WIDTH,
@@ -296,62 +371,136 @@ function GanttPage() {
 
       {/* Gantt Chart SVG */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        {/* Zoom controls */}
+        {/* Toolbar: scroll controls + zoom */}
         <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
-          <div className="text-sm text-gray-500">
-            {formatMonthDay(dateToStr(viewStart))} ~ {formatMonthDay(dateToStr(viewEnd))}
+          <div className="flex items-center gap-2">
+            {/* Scroll buttons */}
+            <button
+              onClick={handleScrollLeft}
+              className="p-1 text-gray-500 hover:text-blue-500 hover:bg-gray-200 rounded transition-colors"
+              title="往左 scroll（往前）"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <button
+              onClick={handleScrollRight}
+              className="p-1 text-gray-500 hover:text-blue-500 hover:bg-gray-200 rounded transition-colors"
+              title="往右 scroll（往後）"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+            <button
+              onClick={handleScrollToToday}
+              className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+              title="跳到今天"
+            >
+              今天
+            </button>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500">縮放:</span>
             <button
-              onClick={() => setZoomLevel('month')}
-              className={`px-2 py-1 text-xs rounded ${zoomLevel === 'month' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-            >月</button>
+              onClick={() => handleZoomChange('day')}
+              className={`px-2 py-1 text-xs rounded ${zoomLevel === 'day' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+            >日</button>
             <button
-              onClick={() => setZoomLevel('week')}
+              onClick={() => handleZoomChange('week')}
               className={`px-2 py-1 text-xs rounded ${zoomLevel === 'week' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
             >週</button>
             <button
-              onClick={() => setZoomLevel('day')}
-              className={`px-2 py-1 text-xs rounded ${zoomLevel === 'day' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-            >日</button>
+              onClick={() => handleZoomChange('month')}
+              className={`px-2 py-1 text-xs rounded ${zoomLevel === 'month' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+            >月</button>
           </div>
         </div>
 
+        {/* Gantt SVG */}
         <div className="overflow-x-auto">
-          <svg width={totalWidth + SIDEBAR_WIDTH} height={Math.max(flatList.length * ROW_HEIGHT, 300)}>
-            {/* Sidebar header */}
-            <rect x={0} y={0} width={SIDEBAR_WIDTH} height={30} fill="#f9fafb" />
-            <text x={10} y={18} className="text-xs font-semibold fill-gray-600" fontSize="12">專案</text>
-
+          <svg
+            width={totalWidth}
+            height={Math.max(flatList.length * ROW_HEIGHT, 300)}
+          >
             {/* Date header */}
-            <rect x={SIDEBAR_WIDTH} y={0} width={totalWidth} height={30} fill="#f9fafb" />
-            {dateHeaders.map((h, i) => (
-              <g key={i}>
-                <rect
-                  x={SIDEBAR_WIDTH + i * DAY_WIDTH}
-                  y={0}
-                  width={DAY_WIDTH}
-                  height={30}
-                  fill={i % 2 === 0 ? 'transparent' : '#f9fafb'}
-                />
-                <text
-                  x={SIDEBAR_WIDTH + i * DAY_WIDTH + DAY_WIDTH / 2}
-                  y={18}
-                  textAnchor="middle"
-                  className="fill-gray-500"
-                  fontSize="10"
-                >
-                  {h.label}
-                </text>
-              </g>
-            ))}
+            {dateHeaders.map((h, i) => {
+              const xPos = i * DAY_WIDTH
+              // Show month label on month-start and week-start headers
+              const showMonthLabel = h.isMonthStart
+              const showWeekLabel = zoomLevel === 'day' && h.isWeekStart
+
+              return (
+                <g key={i}>
+                  {/* Column background with alternating weekend shading */}
+                  <rect
+                    x={xPos}
+                    y={0}
+                    width={DAY_WIDTH}
+                    height={30}
+                    fill={
+                      ((new Date(h.dateStr).getDay() === 0 || new Date(h.dateStr).getDay() === 6)
+                        ? '#f9fafb'
+                        : (i % 4 === 0 ? '#fff' : 'transparent'))
+                    }
+                  />
+                  {/* Vertical grid line */}
+                  <line
+                    x1={xPos}
+                    y1={0}
+                    x2={xPos}
+                    y2={30}
+                    stroke="#e5e7eb"
+                    strokeWidth={h.isMonthStart ? 1.5 : 0.5}
+                  />
+                  {/* Month label (large, at month start) */}
+                  {showMonthLabel && (
+                    <text
+                      x={xPos}
+                      y={20}
+                      textAnchor="start"
+                      className="fill-blue-600"
+                      fontSize="10"
+                      fontWeight="bold"
+                    >
+                      {`${new Date(h.dateStr).toLocaleDateString('zh-TW', { year: '2-digit' })}年${new Date(h.dateStr).toLocaleDateString('zh-TW', { month: 'short' })}`}
+                    </text>
+                  )}
+                  {/* Week label in day view */}
+                  {showWeekLabel && (
+                    <text
+                      x={xPos}
+                      y={28}
+                      textAnchor="start"
+                      className="fill-gray-500"
+                      fontSize="8"
+                    >
+                      {'日一二三四五六'[new Date(h.dateStr).getDay()]}
+                    </text>
+                  )}
+                  {/* Day number (only on month start or every week in week view) */}
+                  {(h.isMonthStart || (zoomLevel === 'week' && i % 4 === 0)) && (
+                    <text
+                      x={xPos + DAY_WIDTH / 2}
+                      y={12}
+                      textAnchor="middle"
+                      className="fill-gray-700"
+                      fontSize="9"
+                      fontWeight={zoomLevel === 'day' ? 'normal' : 'bold'}
+                    >
+                      {new Date(h.dateStr).getDate()}
+                    </text>
+                  )}
+                </g>
+              )
+            })}
 
             {/* Clickable date cells */}
             {dateClickMap.map((cell, i) => (
               <rect
                 key={`click-${i}`}
-                x={SIDEBAR_WIDTH + cell.x}
+                x={cell.x}
                 y={0}
                 width={cell.width}
                 height={30}
@@ -361,87 +510,101 @@ function GanttPage() {
               />
             ))}
 
+            {/* Today vertical line */}
+            <line
+              x1={currentDayOffset}
+              y1={0}
+              x2={currentDayOffset}
+              y2={flatList.length * ROW_HEIGHT}
+              stroke="#ef4444"
+              strokeWidth={2}
+              strokeDasharray="4 2"
+            />
+
             {/* Rows */}
             {filteredList.map((row, idx) => (
               <g key={row.project.id}>
-                {/* Background */}
+                {/* Row background */}
                 <rect
                   x={0}
                   y={30 + idx * ROW_HEIGHT}
-                  width={totalWidth + SIDEBAR_WIDTH}
+                  width={totalWidth}
                   height={ROW_HEIGHT}
                   fill={idx % 2 === 0 ? '#fff' : '#f9fafb'}
                 />
-
-                {/* Sidebar cell */}
-                <g onClick={() => handleProjectClick(row.project.id)} className="cursor-pointer">
-                  <rect
-                    x={0}
-                    y={30 + idx * ROW_HEIGHT}
-                    width={SIDEBAR_WIDTH}
-                    height={ROW_HEIGHT}
+                {/* Vertical grid lines */}
+                {dateHeaders.map((h, di) => (
+                  <line
+                    key={`grid-${idx}-${di}`}
+                    x1={di * DAY_WIDTH}
+                    y1={30 + idx * ROW_HEIGHT}
+                    x2={di * DAY_WIDTH}
+                    y2={30 + (idx + 1) * ROW_HEIGHT}
+                    stroke="#f3f4f6"
+                    strokeWidth={0.5}
                   />
+                ))}
+                {/* Sidebar label */}
+                <g
+                  onClick={() => handleProjectClick(row.project.id)}
+                  className="cursor-pointer"
+                >
                   <text
-                    x={10}
-                    y={30 + idx * ROW_HEIGHT + 22}
+                    x={SIDEBAR_WIDTH - 8}
+                    y={30 + idx * ROW_HEIGHT + 24}
                     className="fill-gray-700"
                     fontSize="11"
                   >
                     {'\u00A0'.repeat(row.depth * 2)}
                     {row.depth > 0 ? '↳ ' : ''}{row.project.name}
                   </text>
+                  {/* Status dot */}
+                  <circle
+                    cx={SIDEBAR_WIDTH - 8}
+                    cy={30 + idx * ROW_HEIGHT + 6}
+                    r={4}
+                    fill={statusColorMap[row.project.status]}
+                  />
                 </g>
-
-                {/* Day-of-week indicator column (thin stripe) */}
-                {dateHeaders.map((h, di) => {
-                  const isWeekend = (new Date(h.dateStr).getDay() === 0 || new Date(h.dateStr).getDay() === 6)
-                  return (
-                    <rect
-                      key={`bg-${idx}-${di}`}
-                      x={SIDEBAR_WIDTH + di * DAY_WIDTH}
-                      y={30 + idx * ROW_HEIGHT}
-                      width={DAY_WIDTH}
-                      height={ROW_HEIGHT}
-                      fill={isWeekend ? '#f3f4f6' : 'transparent'}
-                    />
-                  )
-                })}
-
                 {/* Gantt bar */}
                 {renderBar(row)}
-
-                {/* Status dot */}
-                <circle
-                  cx={SIDEBAR_WIDTH - 8}
-                  cy={30 + idx * ROW_HEIGHT + 20}
-                  r={4}
-                  fill={statusColorMap[row.project.status]}
-                />
-
-                {/* Delete button */}
-                <circle
-                  cx={SIDEBAR_WIDTH - 8}
-                  cy={30 + idx * ROW_HEIGHT + ROW_HEIGHT - 10}
-                  r={6}
-                  fill="none"
-                  stroke="#d1d5db"
-                  strokeWidth={1}
-                  className="cursor-pointer opacity-0 hover:opacity-100"
-                  onClick={() => handleDelete(row.project.id)}
-                />
-                <text
-                  x={SIDEBAR_WIDTH - 8}
-                  y={30 + idx * ROW_HEIGHT + ROW_HEIGHT - 6}
-                  textAnchor="middle"
-                  className="fill-gray-400 hover:fill-red-500 cursor-pointer"
-                  fontSize={8}
-                  onClick={() => handleDelete(row.project.id)}
+                {/* Delete button (appears on hover) */}
+                <g
+                  className="cursor-pointer"
+                  opacity={0.3}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.3')}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDelete(row.project.id)
+                  }}
                 >
-                  ×
-                </text>
+                  <circle
+                    cx={SIDEBAR_WIDTH - 8}
+                    cy={30 + idx * ROW_HEIGHT + ROW_HEIGHT - 8}
+                    r={6}
+                    fill="none"
+                    stroke="#d1d5db"
+                    strokeWidth={1}
+                  />
+                  <text
+                    x={SIDEBAR_WIDTH - 8}
+                    y={30 + idx * ROW_HEIGHT + ROW_HEIGHT - 4}
+                    textAnchor="middle"
+                    className="fill-gray-400 hover:fill-red-500 cursor-pointer"
+                    fontSize={8}
+                  >
+                    ×
+                  </text>
+                </g>
               </g>
             ))}
           </svg>
+        </div>
+
+        {/* Info bar */}
+        <div className="px-4 py-2 bg-blue-50 border-t border-blue-200 text-xs text-blue-700">
+          💡 直接拖拉 SVG 或按左右箭頭瀏覽時間軸 · 點擊日期進入日曆視圖 · 點擊專案進入詳細頁面
         </div>
       </div>
     </div>

@@ -10,6 +10,7 @@ export default defineConfig({
       output: {
         // Disable code splitting - keep everything in one file
         inlineDynamicImports: true,
+        codeSplitting: false,
       },
     },
   },
