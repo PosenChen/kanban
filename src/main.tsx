@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
 
+// Very early console log to verify bundle execution
+console.log('DEBUG-BUNDLE-START: main.tsx module executing')
+
 // Pre-render a loading indicator
 const rootEl = document.getElementById('root')
 if (rootEl) {
