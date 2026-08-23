@@ -38,7 +38,6 @@ interface DayHeader {
   month: number
   year: number
   isMonthStart: boolean
-  isWeekStart: boolean
   dayOfWeek: number // 0=Sun, 6=Sat
 }
 
@@ -135,7 +134,6 @@ function GanttPage() {
         month: d.getMonth() + 1,
         year: d.getFullYear(),
         isMonthStart: d.getDate() === 1,
-        isWeekStart: d.getDay() === 1,
         dayOfWeek: d.getDay(),
       })
       d.setDate(d.getDate() + 1)
@@ -214,10 +212,10 @@ function GanttPage() {
 
   // ── Render a single gantt bar ──
   const renderBar = (project: Project, yPos: number, groupHeight: number, barHeight: number) => {
-    const startMs = new Date(project.start_date).getTime()
-    const endMs = new Date(project.end_date).getTime()
-    const viewStartMs = new Date(viewStart).getTime()
-    const viewEndMs = new Date(viewEndStr).getTime()
+    const startMs = localDate(project.start_date).getTime()
+    const endMs = localDate(project.end_date).getTime()
+    const viewStartMs = localDate(viewStart).getTime()
+    const viewEndMs = localDate(viewEndStr).getTime()
 
     if (endMs < viewStartMs || startMs > viewEndMs) return null
 
@@ -237,30 +235,48 @@ function GanttPage() {
             stroke={statusColorMap[project.status] || '#A855F7'}
             strokeWidth={2}
           />
-          {/* Tooltip */}
-          <foreignObject x={x + 10} y={yPos} width={160} height={barHeight}>
-            <div className="text-xs text-gray-600 truncate">
-              {project.name}
-            </div>
-          </foreignObject>
+          {/* Name label next to arrow */}
+          <text
+            x={x + 12}
+            y={yPos + barHeight / 2 + 2}
+            className="fill-gray-700"
+            fontSize="9"
+          >
+            {project.name}
+          </text>
         </g>
       )
     }
 
-    // Regular bar
+    // Regular bar — return a <g> with bar + name label
+    const labelX = x + 6
+    const labelFit = barWidth > 40
     return (
-      <rect
-        key={`bar-${project.id}`}
-        x={x}
-        y={yPos + 2}
-        width={barWidth}
-        height={barHeight - 4}
-        rx={3}
-        ry={3}
-        fill={statusColorMap[project.status] || '#3B82F6'}
-        className="cursor-pointer hover:opacity-90 transition-opacity"
-        onClick={() => handleProjectClick(project.id)}
-      />
+      <g key={`bar-${project.id}`}>
+        {/* Gantt bar */}
+        <rect
+          x={x}
+          y={yPos + 2}
+          width={barWidth}
+          height={barHeight - 4}
+          rx={3}
+          ry={3}
+          fill={statusColorMap[project.status] || '#3B82F6'}
+          className="cursor-pointer hover:opacity-90 transition-opacity"
+          onClick={() => handleProjectClick(project.id)}
+        />
+        {/* Project name label next to bar (always visible) */}
+        {labelFit && (
+          <text
+            x={labelX}
+            y={yPos + barHeight / 2 + 2}
+            className="fill-white font-medium"
+            fontSize="9"
+          >
+            {project.name}
+          </text>
+        )}
+      </g>
     )
   }
 
@@ -276,13 +292,13 @@ function GanttPage() {
 
         return (
           <g key={i}>
-            {/* Column background */}
+            {/* Column background — weekend = light gray, weekday = white */}
             <rect
               x={xPos}
               y={0}
               width={DAY_WIDTH}
               height={headerHeight}
-              fill={isWeekend ? '#f3f4f6' : (i % 2 === 0 ? '#fff' : 'transparent')}
+              fill={isWeekend ? '#f3f4f6' : '#fff'}
             />
 
             {/* Vertical grid line */}
@@ -321,20 +337,7 @@ function GanttPage() {
               </text>
             )}
 
-            {/* Week start label in day view (always day view now) */}
-            {h.isWeekStart && (
-              <text
-                x={xPos}
-                y={headerHeight - 14}
-                textAnchor="start"
-                className="fill-gray-500"
-                fontSize="8"
-              >
-                {'一二三四五六日'[h.dayOfWeek]}
-              </text>
-            )}
-
-            {/* Day number for all days in day view (small) */}
+            {/* Day number for all days (small) */}
             {!h.isMonthStart && (
               <text
                 x={xPos + DAY_WIDTH / 2}
@@ -344,32 +347,6 @@ function GanttPage() {
                 fontSize="8"
               >
                 {h.dayNum}
-              </text>
-            )}
-
-            {/* Day number in week/month view (only on month start) */}
-            {h.isMonthStart && (
-              <text
-                x={xPos + DAY_WIDTH / 2}
-                y={headerHeight - 6}
-                textAnchor="end"
-                className="fill-gray-400"
-                fontSize="7"
-              >
-                {h.dayNum}
-              </text>
-            )}
-
-            {/* Week label (every 7 days, labeled by weekday) */}
-            {h.isWeekStart && (
-              <text
-                x={xPos + DAY_WIDTH / 2}
-                y={10}
-                textAnchor="middle"
-                className="fill-gray-500"
-                fontSize="7"
-              >
-                {'一二三四五六日'[h.dayOfWeek]}
               </text>
             )}
           </g>
