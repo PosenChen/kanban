@@ -116,12 +116,20 @@ function GanttPage() {
   }, [projects])
 
   // ── View range ──
-  const { dateHeaders, viewEndStr } = useMemo(() => {
+  const { dateHeaders, viewEndStr, milestoneDates } = useMemo(() => {
     const startDate = localDate(viewStart)
     // Show enough days for scrolling
     const range = 730 // 2 years
     const endDate = new Date(startDate)
     endDate.setDate(endDate.getDate() + range)
+
+    // Collect milestone dates
+    const milestoneSet = new Set<string>()
+    projects.forEach(p => {
+      if (p.status === 'milestone') {
+        milestoneSet.add(p.start_date)
+      }
+    })
 
     const headers: DayHeader[] = []
     const d = new Date(startDate)
@@ -142,8 +150,9 @@ function GanttPage() {
     return {
       dateHeaders: headers,
       viewEndStr: dateToStr(endDate),
+      milestoneDates: milestoneSet,
     }
-  }, [viewStart])
+  }, [viewStart, projects])
 
   const totalWidth = dateHeaders.length * DAY_WIDTH
 
@@ -289,16 +298,20 @@ function GanttPage() {
       {dateHeaders.map((h, i) => {
         const xPos = i * DAY_WIDTH
         const isWeekend = h.dayOfWeek === 0 || h.dayOfWeek === 6
+        const isMilestone = milestoneDates.has(h.dateStr)
+        let bgColor = '#fff'
+        if (isWeekend) bgColor = '#f3f4f6'
+        if (isMilestone) bgColor = '#f3e8ff' // subtle purple for milestone
 
         return (
           <g key={i}>
-            {/* Column background — weekend = light gray, weekday = white */}
+            {/* Column background — weekend = gray, milestone = subtle purple, weekday = white */}
             <rect
               x={xPos}
               y={0}
               width={DAY_WIDTH}
               height={headerHeight}
-              fill={isWeekend ? '#f3f4f6' : '#fff'}
+              fill={bgColor}
             />
 
             {/* Vertical grid line */}
@@ -659,6 +672,25 @@ function GanttPage() {
                   {/* Root project bar */}
                   {renderBar(rootProject, yPos + 6, ROW_MIN_HEIGHT - 12, ROW_MIN_HEIGHT - 16)}
                 </g>
+              )
+            })}
+
+            {/* Milestone vertical lines (spanning all rows) */}
+            {Array.from(milestoneDates).map(mDate => {
+              const idx = dateHeaders.findIndex(h => h.dateStr === mDate)
+              if (idx < 0) return null
+              const x = idx * DAY_WIDTH + DAY_WIDTH / 2
+              return (
+                <line
+                  key={`mile-${mDate}`}
+                  x1={x}
+                  y1={headerHeight}
+                  x2={x}
+                  y2={headerHeight + totalGanttHeight}
+                  stroke="#c4b5fd"
+                  strokeWidth={2}
+                  strokeDasharray="4 4"
+                />
               )
             })}
           </svg>
