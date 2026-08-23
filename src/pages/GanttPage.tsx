@@ -1,18 +1,20 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
-import { STATUS_CONFIG, PRIORITY_CONFIG, type Project, type ProjectStatus } from '@/types/project'
-import { dateToStr, addDays, getDaysDiff } from '@/utils/dateUtils'
+import { STATUS_CONFIG, type Project } from '@/types/project'
+import { dateToStr } from '@/utils/dateUtils'
 
 // ── Constants ──
-const DATE_COL_WIDTH = 24 // narrow enough for "31" (2 digits)
 const DAY_WIDTH = 24      // 1 day = 24px
-const ROW_HEIGHT = 48
 const ROW_MIN_HEIGHT = 48 // min height per sub-project group
 const SUBROW_HEIGHT = 20  // height per sub-project within a group
 const SIDEBAR_WIDTH = 200
 
-// ── Helpers ──
+// Parse a YYYY-MM-DD string as a local-date midnight (not UTC)
+function localDate(str: string): Date {
+  const [y, m, d] = str.split('-').map(Number)
+  return new Date(y, m - 1, d) // Date constructor uses local timezone
+}
 
 /** Group projects by parent: root projects get their own row; sub-projects share a row group */
 function buildRowGroups(projects: Project[]): { projectId: string; subProjects: Project[] }[] {
@@ -44,18 +46,14 @@ function GanttPage() {
   const navigate = useNavigate()
   const { projects, add, remove } = useProjects()
   const rowGroups = useMemo(() => buildRowGroups(projects), [projects])
-  const mileIdSet = useMemo(() => milestoneIds(projects), [projects])
 
   // ── View state ──
-  const todayStr = dateToStr(new Date())
-  const [zoomLevel, setZoomLevel] = useState<'month' | 'week' | 'day'>('day')
   const [viewStart, setViewStart] = useState(() => {
     const firstDate = projects.length
       ? projects.reduce((min, p) => p.start_date < min ? p.start_date : min, projects[0].start_date)
-      : todayStr
+      : dateToStr(new Date())
     return firstDate
   })
-  const [scrollOffset, setScrollOffset] = useState(0)
 
   // ── Filter ──
   const [searchQuery, setSearchQuery] = useState('')
@@ -120,8 +118,7 @@ function GanttPage() {
 
   // ── View range ──
   const { dateHeaders, viewEndStr } = useMemo(() => {
-    const startDate = new Date(viewStart)
-    startDate.setHours(0, 0, 0, 0)
+    const startDate = localDate(viewStart)
     // Show enough days for scrolling
     const range = 730 // 2 years
     const endDate = new Date(startDate)
@@ -154,7 +151,8 @@ function GanttPage() {
 
   // Today offset
   const todayOffset = useMemo(() => {
-    const idx = dateHeaders.findIndex(h => h.dateStr === todayStr)
+    const today = dateToStr(new Date())
+    const idx = dateHeaders.findIndex(h => h.dateStr === today)
     return idx >= 0 ? idx * DAY_WIDTH : 0
   }, [dateHeaders])
 
@@ -168,25 +166,20 @@ function GanttPage() {
 
   // ── Scroll helpers ──
   const handleScrollLeft = useCallback(() => {
-    const daysBack = 30
-    setViewStart(addDays(viewStart, -daysBack))
-    setScrollOffset(0)
+    const now = localDate(viewStart)
+    now.setDate(now.getDate() - 30)
+    setViewStart(dateToStr(now))
   }, [viewStart])
 
   const handleScrollRight = useCallback(() => {
-    const daysForward = 30
-    setViewStart(addDays(viewStart, daysForward))
-    setScrollOffset(0)
+    const now = localDate(viewStart)
+    now.setDate(now.getDate() + 30)
+    setViewStart(dateToStr(now))
   }, [viewStart])
 
   const handleScrollToToday = useCallback(() => {
-    setViewStart(todayStr)
-    setScrollOffset(0)
-  }, [])
-
-  const handleZoomChange = useCallback((level: 'month' | 'week' | 'day') => {
-    setZoomLevel(level)
-    setScrollOffset(0)
+    const today = new Date()
+    setViewStart(dateToStr(today))
   }, [])
 
   // ── Handlers ──
@@ -328,8 +321,8 @@ function GanttPage() {
               </text>
             )}
 
-            {/* Week start label in day view */}
-            {zoomLevel === 'day' && h.isWeekStart && (
+            {/* Week start label in day view (always day view now) */}
+            {h.isWeekStart && (
               <text
                 x={xPos}
                 y={headerHeight - 14}
@@ -342,7 +335,7 @@ function GanttPage() {
             )}
 
             {/* Day number for all days in day view (small) */}
-            {zoomLevel === 'day' && !h.isMonthStart && (
+            {!h.isMonthStart && (
               <text
                 x={xPos + DAY_WIDTH / 2}
                 y={14}
@@ -355,7 +348,7 @@ function GanttPage() {
             )}
 
             {/* Day number in week/month view (only on month start) */}
-            {zoomLevel !== 'day' && h.isMonthStart && (
+            {h.isMonthStart && (
               <text
                 x={xPos + DAY_WIDTH / 2}
                 y={headerHeight - 6}
@@ -367,8 +360,8 @@ function GanttPage() {
               </text>
             )}
 
-            {/* Week label (every 7 days in day view, labeled by weekday) */}
-            {zoomLevel === 'day' && h.isWeekStart && (
+            {/* Week label (every 7 days, labeled by weekday) */}
+            {h.isWeekStart && (
               <text
                 x={xPos + DAY_WIDTH / 2}
                 y={10}
@@ -531,24 +524,9 @@ function GanttPage() {
               今天
             </button>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">縮放:</span>
-            <button
-              onClick={() => handleZoomChange('day')}
-              className={`px-2 py-1 text-xs rounded ${zoomLevel === 'day' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-            >日</button>
-            <button
-              onClick={() => handleZoomChange('week')}
-              className={`px-2 py-1 text-xs rounded ${zoomLevel === 'week' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-            >週</button>
-            <button
-              onClick={() => handleZoomChange('month')}
-              className={`px-2 py-1 text-xs rounded ${zoomLevel === 'month' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-            >月</button>
-          </div>
         </div>
 
-        {/* Gantt SVG */}
+        {/* Gantt Chart SVG */}
         <div className="overflow-x-auto">
           <svg
             width={totalWidth}
