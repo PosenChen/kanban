@@ -1,9 +1,14 @@
-import { useState, useCallback } from 'react'
-import { projectStore, scheduleGitHubSync } from '@/data/localStorageStore'
+import { useState, useEffect, useCallback } from 'react'
+import { projectStore, scheduleGitHubSync, getSyncStatus, getStorageSource, setStorageSource } from '@/data/localStorageStore'
 
 function SettingsPage() {
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
+  const [syncInfo, setSyncInfo] = useState({ useGitHub: false, hasToken: false })
+
+  useEffect(() => {
+    setSyncInfo(getSyncStatus())
+  }, [])
 
   const handleExport = () => {
     const raw = localStorage.getItem('kanban_projects')
@@ -48,6 +53,7 @@ function SettingsPage() {
     if (t.length < 10) { alert('請輸入有效的 GitHub Personal Access Token') }
     else {
       localStorage.setItem('kanban_github_token', t)
+      setSyncInfo(getSyncStatus())
       alert('Token 已儲存！')
     }
   }
@@ -55,6 +61,8 @@ function SettingsPage() {
   const handleRemoveToken = () => {
     if (!confirm('移除 GitHub Token 並切回 LocalStorage？')) return
     localStorage.removeItem('kanban_github_token')
+    localStorage.removeItem('kanban_storage_source')
+    setSyncInfo(getSyncStatus())
     alert('已移除')
   }
 
@@ -79,6 +87,21 @@ function SettingsPage() {
     }
   }
 
+  const handleSwitchToGitHub = () => {
+    const token = localStorage.getItem('kanban_github_token')
+    if (!token || token.trim().length < 10) {
+      alert('請先輸入 GitHub Token')
+      return
+    }
+    setStorageSource('github')
+    window.location.reload()
+  }
+
+  const handleSwitchToLocal = () => {
+    setStorageSource('local')
+    window.location.reload()
+  }
+
   return (
     <div className="max-w-lg mx-auto space-y-6">
       <button onClick={() => window.history.back()} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
@@ -87,13 +110,29 @@ function SettingsPage() {
 
       <div className="bg-blue-50 rounded-lg p-4 text-sm text-blue-700">
         <p><strong>數據持久化設置</strong></p>
-        <p>使用 GitHub API 將專案數據保存到 GitHub 倉庫，實現跨裝置同步</p>
+        <p>選擇數據保存方式以確保跨裝置同步</p>
       </div>
 
+      {/* 同步狀態 */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-        {/* GitHub API 設置 */}
         <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">GitHub Personal Access Token</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">📡 同步狀態</h3>
+          {syncInfo.hasToken ? (
+            <div className="space-y-2 text-sm">
+              <p className="text-green-600 font-medium">✅ 已检测到 GitHub Token</p>
+              <p className="text-gray-500">當前使用方式：{getStorageSource() === 'github' ? 'GitHub API（自動同步）' : 'LocalStorage（本地儲存）'}</p>
+            </div>
+          ) : (
+            <div className="space-y-2 text-sm">
+              <p className="text-orange-600 font-medium">⚠️ 未检测到 GitHub Token</p>
+              <p className="text-gray-500">目前只使用 LocalStorage（每個瀏覽器獨立保存）</p>
+            </div>
+          )}
+        </div>
+
+        {/* GitHub Token 輸入 */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">🔑 GitHub Personal Access Token</h3>
           <p className="text-xs text-gray-400 mb-2">
             repo 權限 → GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
           </p>
@@ -103,10 +142,10 @@ function SettingsPage() {
             <button onClick={handleSaveToken}
               className="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">儲存 Token</button>
           </div>
-          <button onClick={handleRemoveToken}
-            className="mt-2 px-3 py-1.5 text-xs border border-red-300 text-red-500 rounded hover:bg-red-50">移除 Token</button>
-          <button onClick={handleSyncNow}
-            className="mt-2 ml-2 px-3 py-1.5 text-xs border border-purple-300 text-purple-600 rounded hover:bg-purple-50">立即同步到 GitHub</button>
+          {syncInfo.hasToken && (
+            <button onClick={handleRemoveToken}
+              className="mt-2 px-3 py-1.5 text-xs border border-red-300 text-red-500 rounded hover:bg-red-50">移除 Token</button>
+          )}
           {syncStatus === 'error' && (
             <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">{errorMessage}</div>
           )}
@@ -115,9 +154,33 @@ function SettingsPage() {
           )}
         </div>
 
+        {/* 同步按鈕 */}
+        <div className="flex gap-2 flex-wrap">
+          {syncInfo.hasToken && (
+            <>
+              <button onClick={handleSyncNow}
+                className="px-3 py-2 bg-purple-500 text-white rounded-lg text-sm hover:bg-purple-600">
+                🔄 立即同步到 GitHub
+              </button>
+              {getStorageSource() === 'local' && (
+                <button onClick={handleSwitchToGitHub}
+                  className="px-3 py-2 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600">
+                  🔄 切換為 GitHub 同步
+                </button>
+              )}
+            </>
+          )}
+          {getStorageSource() === 'github' && (
+            <button onClick={handleSwitchToLocal}
+              className="px-3 py-2 bg-gray-500 text-white rounded-lg text-sm hover:bg-gray-600">
+              📁 切換為 LocalStorage
+            </button>
+          )}
+        </div>
+
         {/* 備份 / 還原 */}
         <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">備份 / 還原</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">💾 備份 / 還原</h3>
           <div className="flex gap-3">
             <button onClick={handleExport}
               className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100">📤 匯出 JSON</button>
@@ -127,13 +190,20 @@ function SettingsPage() {
         </div>
 
         {/* 使用說明 */}
-        <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-500 space-y-1">
-          <p><strong>數據同步說明：</strong></p>
-          <ol className="list-decimal list-inside space-y-0.5">
-            <li><strong>LocalStorage</strong>：數據保存在瀏覽器中，關閉頁面後仍存在</li>
-            <li><strong>GitHub API</strong>：將數據保存到 GitHub 倉庫（PosenChen/kanban-data），可跨裝置訪問</li>
+        <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-500 space-y-2">
+          <p><strong>數據同步原理：</strong></p>
+          <ol className="list-decimal list-inside space-y-1">
+            <li>
+              <strong>打開網頁時</strong>：如果有 GitHub Token，會從 GitHub 讀取最新專案數據
+            </li>
+            <li>
+              <strong>新增/修改/刪除專案時</strong>：自動 3 秒後寫入 GitHub
+            </li>
+            <li>
+              <strong>跨裝置使用</strong>：在不同電腦/手機打開網頁，都會從 GitHub 同步最新數據
+            </li>
           </ol>
-          <p className="mt-1">輸入 GitHub Token 後點擊「儲存 Token」，之後每次修改專案都會自動同步到 GitHub。</p>
+          <p className="mt-1 text-blue-600">💡 只要在所有裝置上都設定相同的 GitHub Token，就能實現跨裝置數據同步！</p>
         </div>
       </div>
     </div>

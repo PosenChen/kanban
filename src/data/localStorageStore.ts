@@ -21,17 +21,6 @@ export function saveLocal(projects: Project[]): void {
   localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(projects))
 }
 
-// Seed sample data on first visit
-let cached: Project[] = loadLocal()
-if (cached.length === 0) {
-  cached = SAMPLE_PROJECTS_WITH_META
-  saveLocal(cached)
-}
-
-function emitChange() {
-  window.dispatchEvent(new CustomEvent('kanban:data-change', { detail: cached }))
-}
-
 // ── GitHub API ──
 
 export async function readGitHub(token: string): Promise<Project[]> {
@@ -83,6 +72,41 @@ export async function writeGitHub(token: string, projects: Project[]): Promise<v
 }
 
 // ── Unified store ──
+
+let cached: Project[] = []
+let useGitHub = false
+
+async function initCache() {
+  const token = localStorage.getItem(STORAGE_KEY_TOKEN) || ''
+  const source = (localStorage.getItem(STORAGE_KEY_SOURCE) as 'local' | 'github') || 'github'
+
+  if (source === 'github' && token.trim().length >= 10) {
+    const projects = await readGitHub(token.trim())
+    if (projects.length > 0) {
+      cached = projects
+      useGitHub = true
+      saveLocal(cached)
+      emitChange()
+      return
+    }
+  }
+
+  // Fallback to LocalStorage
+  cached = loadLocal()
+  if (cached.length === 0) {
+    cached = SAMPLE_PROJECTS_WITH_META
+    saveLocal(cached)
+  }
+  useGitHub = false
+  emitChange()
+}
+
+// Initialize async cache on load
+initCache()
+
+function emitChange() {
+  window.dispatchEvent(new CustomEvent('kanban:data-change', { detail: cached }))
+}
 
 export const projectStore = {
   getAll(): Project[] {
@@ -168,6 +192,7 @@ export const projectStore = {
 
   sync() {
     cached = loadLocal()
+    emitChange()
   },
 }
 
@@ -189,6 +214,7 @@ export function scheduleGitHubSync(token: string | null, force: boolean = false)
   syncTimer = setTimeout(async () => {
     try {
       await writeGitHub(token.trim(), cached)
+      console.log('✅ Synced to GitHub')
     } catch (err: unknown) {
       console.warn('GitHub sync failed:', err)
     }
@@ -196,9 +222,14 @@ export function scheduleGitHubSync(token: string | null, force: boolean = false)
 }
 
 export function getStorageSource(): 'local' | 'github' {
-  return (localStorage.getItem(STORAGE_KEY_SOURCE) as 'local' | 'github') || 'local'
+  return (localStorage.getItem(STORAGE_KEY_SOURCE) as 'local' | 'github') || 'github'
 }
 
 export function setStorageSource(source: 'local' | 'github'): void {
   localStorage.setItem(STORAGE_KEY_SOURCE, source)
+}
+
+export function getSyncStatus(): { useGitHub: boolean; hasToken: boolean } {
+  const token = localStorage.getItem(STORAGE_KEY_TOKEN) || ''
+  return { useGitHub, hasToken: token.trim().length >= 10 }
 }
