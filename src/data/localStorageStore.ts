@@ -4,6 +4,7 @@ import { SAMPLE_PROJECTS_WITH_META } from './sampleData'
 const STORAGE_KEY_DATA = 'kanban_projects'
 const STORAGE_KEY_TOKEN = 'kanban_github_token'
 const STORAGE_KEY_SOURCE = 'kanban_storage_source'
+const STORAGE_KEY_FIREBASE = 'kanban_firebase_enabled'
 
 // ── LocalStorage (always active) ──
 
@@ -178,6 +179,37 @@ window.addEventListener('storage', (e) => {
   }
 })
 
+// ── Firebase Sync ──
+
+let firebaseUnsubscribe: (() => void) | null = null
+
+export function initFirebaseSync() {
+  // Import dynamically to avoid loading Firebase if not enabled
+  import('@/services/firebaseService').then(({ syncWithFirestore, PROJECTS_COLLECTION }) => {
+    if (firebaseUnsubscribe) {
+      firebaseUnsubscribe()
+    }
+    firebaseUnsubscribe = syncWithFirestore()
+  }).catch((error) => {
+    console.error('Failed to initialize Firebase sync:', error)
+  })
+}
+
+export function stopFirebaseSync() {
+  if (firebaseUnsubscribe) {
+    firebaseUnsubscribe()
+    firebaseUnsubscribe = null
+  }
+}
+
+export function isFirebaseEnabled(): boolean {
+  return localStorage.getItem(STORAGE_KEY_FIREBASE) === 'true'
+}
+
+export function setFirebaseEnabled(enabled: boolean): void {
+  localStorage.setItem(STORAGE_KEY_FIREBASE, enabled.toString())
+}
+
 // ── Defered GitHub sync (debounced 3s) ──
 
 let syncTimer: ReturnType<typeof setTimeout> | null = null
@@ -195,10 +227,11 @@ export function scheduleGitHubSync(token: string | null, force: boolean = false)
   }, force ? 0 : 3000)
 }
 
-export function getStorageSource(): 'local' | 'github' {
+export function getStorageSource(): 'local' | 'github' | 'firebase' {
+  if (isFirebaseEnabled()) return 'firebase'
   return (localStorage.getItem(STORAGE_KEY_SOURCE) as 'local' | 'github') || 'local'
 }
 
-export function setStorageSource(source: 'local' | 'github'): void {
+export function setStorageSource(source: 'local' | 'github' | 'firebase'): void {
   localStorage.setItem(STORAGE_KEY_SOURCE, source)
 }
