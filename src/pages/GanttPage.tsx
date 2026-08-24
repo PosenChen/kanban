@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
-import { projectStore } from '@/data/localStorageStore'
+import { projectStore, setStorageSource } from '@/data/localStorageStore'
 import { STATUS_CONFIG, type Project } from '@/types/project'
 import { dateToStr } from '@/utils/dateUtils'
 
@@ -205,6 +205,7 @@ function GanttPage() {
     setIsLoading(true)
     try {
       await projectStore.loadFromGitHub(token.trim())
+      setStorageSource('github')
       alert('✅ 已從 GitHub 讀取最新專案資料！')
     } catch (err: unknown) {
       alert('❌ 讀取失敗：' + (err as Error).message)

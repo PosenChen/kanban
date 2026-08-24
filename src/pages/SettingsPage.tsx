@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { projectStore, scheduleGitHubSync, getSyncStatus, getStorageSource, setStorageSource } from '@/data/localStorageStore'
 
 function SettingsPage() {
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle')
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'loading' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
   const [syncInfo, setSyncInfo] = useState({ useGitHub: false, hasToken: false })
 
@@ -64,6 +64,25 @@ function SettingsPage() {
     localStorage.removeItem('kanban_storage_source')
     setSyncInfo(getSyncStatus())
     alert('已移除')
+  }
+
+  const handlePullGitHub = async () => {
+    const token = localStorage.getItem('kanban_github_token')
+    if (!token || token.trim().length < 10) {
+      alert('尚未設定 GitHub Token')
+      return
+    }
+    setSyncStatus('loading')
+    setErrorMessage('')
+    try {
+      await projectStore.loadFromGitHub(token.trim())
+      setSyncStatus('success')
+      setTimeout(() => setSyncStatus('idle'), 3000)
+    } catch (error) {
+      setSyncStatus('error')
+      setErrorMessage('讀取失敗：' + (error as Error).message)
+      setTimeout(() => setSyncStatus('idle'), 5000)
+    }
   }
 
   const handlePushGitHub = () => {
@@ -158,6 +177,10 @@ function SettingsPage() {
           <div className="flex gap-2 flex-wrap">
             {syncInfo.hasToken && (
               <>
+                <button onClick={handlePullGitHub}
+                  className="px-3 py-2 bg-orange-500 text-white rounded-lg text-sm hover:bg-orange-600">
+                  📥 下載 GitHub（讀取）
+                </button>
                 <button onClick={handlePushGitHub}
                   className="px-3 py-2 bg-purple-500 text-white rounded-lg text-sm hover:bg-purple-600">
                   📤 上傳到 GitHub（同步）
@@ -176,6 +199,9 @@ function SettingsPage() {
           )}
           {syncStatus === 'success' && (
             <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-600">✅ 同步成功！</div>
+          )}
+          {syncStatus === 'loading' && (
+            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-600">⏳ 讀取中...</div>
           )}
         </div>
 

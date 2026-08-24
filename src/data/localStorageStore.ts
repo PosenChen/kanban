@@ -26,7 +26,7 @@ export function saveLocal(projects: Project[]): void {
 export async function readGitHub(token: string): Promise<Project[]> {
   try {
     const res = await fetch('https://api.github.com/repos/PosenChen/kanban-data/contents/data/projects.json', {
-      headers: { Authorization: `*** ${token}`, Accept: 'application/vnd.github.v3+json' },
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' },
       signal: AbortSignal.timeout(15000),
     })
     if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
@@ -45,7 +45,7 @@ export async function writeGitHub(token: string, projects: Project[]): Promise<v
   let sha = ''
   try {
     const res = await fetch('https://api.github.com/repos/PosenChen/kanban-data/contents/data/projects.json', {
-      headers: { Authorization: `*** ${token}`, Accept: 'application/vnd.github.v3+json' },
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' },
       signal: AbortSignal.timeout(10000),
     })
     if (res.ok) {
@@ -57,7 +57,7 @@ export async function writeGitHub(token: string, projects: Project[]): Promise<v
   await fetch('https://api.github.com/repos/PosenChen/kanban-data/contents/data/projects.json', {
     method: 'PUT',
     headers: {
-      Authorization: `*** ${token}`,
+      Authorization: `token ${token}`,
       Accept: 'application/vnd.github.v3+json',
       'Content-Type': 'application/json',
     },
@@ -175,7 +175,7 @@ export const projectStore = {
     if (projects.length > 0) {
       cached = projects
       useGitHub = true
-      saveLocal(cached)
+      setStorageSource('github')
       emitChange()
       return projects
     }
