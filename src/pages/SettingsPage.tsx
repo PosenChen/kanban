@@ -1,10 +1,7 @@
 import { useState, useCallback } from 'react'
-import { projectStore } from '@/data/localStorageStore'
-import { isFirebaseEnabled, setFirebaseEnabled } from '@/data/localStorageStore'
-import { db, PROJECTS_COLLECTION, addProjectToFirestore, updateProjectInFirestore, deleteProjectFromFirestore } from '@/services/firebaseService'
+import { projectStore, scheduleGitHubSync } from '@/data/localStorageStore'
 
 function SettingsPage() {
-  const [isFirebaseEnabled, setIsFirebaseEnabled] = useState(false)
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -45,36 +42,41 @@ function SettingsPage() {
     input.click()
   }
 
-  const handleSyncToFirebase = async () => {
-    setSyncStatus('syncing')
-    setErrorMessage('')
-    
-    try {
-      const projects = projectStore.getAll()
-      
-      // 這裡應該調用 Firebase 服務來同步數據
-      // 由於需要完整的 Firebase 設置，這裡只展示基本邏輯
-      
-      // 實際實現應該：
-      // 1. 獲取所有本地專案
-      // 2. 上傳到 Firestore
-      // 3. 處理衝突和同步狀態
-      
-      setSyncStatus('success')
-      setTimeout(() => setSyncStatus('idle'), 3000)
-    } catch (error) {
-      setSyncStatus('error')
-      setErrorMessage('同步失敗：' + (error as Error).message)
-      setTimeout(() => {
-        setSyncStatus('idle')
-        setErrorMessage('')
-      }, 5000)
+  const handleSaveToken = () => {
+    const input = document.getElementById('gh-token-input') as HTMLInputElement | null
+    const t = input?.value?.trim() || ''
+    if (t.length < 10) { alert('請輸入有效的 GitHub Personal Access Token') }
+    else {
+      localStorage.setItem('kanban_github_token', t)
+      alert('Token 已儲存！')
     }
   }
 
-  const handleEnableFirebase = () => {
-    setIsFirebaseEnabled(!isFirebaseEnabled)
-    setFirebaseEnabled(!isFirebaseEnabled)
+  const handleRemoveToken = () => {
+    if (!confirm('移除 GitHub Token 並切回 LocalStorage？')) return
+    localStorage.removeItem('kanban_github_token')
+    alert('已移除')
+  }
+
+  const handleSyncNow = () => {
+    const token = localStorage.getItem('kanban_github_token')
+    if (!token || token.trim().length < 10) {
+      alert('尚未設定 GitHub Token')
+      return
+    }
+    setSyncStatus('syncing')
+    setErrorMessage('')
+    try {
+      scheduleGitHubSync(token, true)
+      setTimeout(() => {
+        setSyncStatus('success')
+        setTimeout(() => setSyncStatus('idle'), 3000)
+      }, 1000)
+    } catch (error) {
+      setSyncStatus('error')
+      setErrorMessage('同步失敗：' + (error as Error).message)
+      setTimeout(() => setSyncStatus('idle'), 5000)
+    }
   }
 
   return (
@@ -85,79 +87,32 @@ function SettingsPage() {
 
       <div className="bg-blue-50 rounded-lg p-4 text-sm text-blue-700">
         <p><strong>數據持久化設置</strong></p>
-        <p>選擇數據保存方式以確保跨裝置同步</p>
+        <p>使用 GitHub API 將專案數據保存到 GitHub 倉庫，實現跨裝置同步</p>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-        {/* Firebase 設置 */}
-        <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Firebase Firestore 同步</h3>
-          <p className="text-xs text-gray-400 mb-3">跨裝置同步專案數據，使用 Firebase Firestore 作為數據庫</p>
-          
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleEnableFirebase}
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isFirebaseEnabled 
-                  ? 'bg-green-500 text-white hover:bg-green-600' 
-                  : 'bg-blue-500 text-white hover:bg-blue-600'
-              }`}
-            >
-              {isFirebaseEnabled ? '已啟用' : '啟用同步'}
-            </button>
-            
-            {isFirebaseEnabled && (
-              <button
-                onClick={handleSyncToFirebase}
-                disabled={syncStatus === 'syncing'}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  syncStatus === 'syncing'
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-purple-500 text-white hover:bg-purple-600'
-                }`}
-              >
-                {syncStatus === 'syncing' ? '同步中...' : '立即同步'}
-              </button>
-            )}
-          </div>
-          
-          {syncStatus === 'error' && (
-            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">
-              {errorMessage}
-            </div>
-          )}
-          
-          {syncStatus === 'success' && (
-            <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-600">
-              ✅ 同步成功！
-            </div>
-          )}
-        </div>
-
         {/* GitHub API 設置 */}
         <div>
           <h3 className="text-sm font-semibold text-gray-700 mb-2">GitHub Personal Access Token</h3>
-          <p className="text-xs text-gray-400 mb-2">repo 權限 → GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)</p>
+          <p className="text-xs text-gray-400 mb-2">
+            repo 權限 → GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
+          </p>
           <div className="flex gap-2">
-            <input type="text" id="gh-token-input" placeholder="***"
+            <input type="text" id="gh-token-input" placeholder="ghp_..."
               className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-            <button onClick={() => {
-              const input = document.getElementById('gh-token-input') as HTMLInputElement | null
-              const t = input?.value?.trim() || ''
-              if (t.length < 10) { alert('請輸入有效的 GitHub Personal Access Token') }
-              else {
-                localStorage.setItem('kanban_github_token', t)
-                alert('Token 已儲存！')
-              }
-            }}
+            <button onClick={handleSaveToken}
               className="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">儲存 Token</button>
           </div>
-          <button onClick={() => {
-            if (!confirm('移除 GitHub Token 並切回 LocalStorage？')) return
-            localStorage.removeItem('kanban_github_token')
-            alert('已移除')
-          }}
+          <button onClick={handleRemoveToken}
             className="mt-2 px-3 py-1.5 text-xs border border-red-300 text-red-500 rounded hover:bg-red-50">移除 Token</button>
+          <button onClick={handleSyncNow}
+            className="mt-2 ml-2 px-3 py-1.5 text-xs border border-purple-300 text-purple-600 rounded hover:bg-purple-50">立即同步到 GitHub</button>
+          {syncStatus === 'error' && (
+            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">{errorMessage}</div>
+          )}
+          {syncStatus === 'success' && (
+            <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-600">✅ 同步成功！</div>
+          )}
         </div>
 
         {/* 備份 / 還原 */}
@@ -173,12 +128,12 @@ function SettingsPage() {
 
         {/* 使用說明 */}
         <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-500 space-y-1">
-          <p><strong>數據同步選項：</strong></p>
+          <p><strong>數據同步說明：</strong></p>
           <ol className="list-decimal list-inside space-y-0.5">
             <li><strong>LocalStorage</strong>：數據保存在瀏覽器中，關閉頁面後仍存在</li>
-            <li><strong>Firebase Firestore</strong>：跨裝置同步，需要在 Firebase 控制台設置數據庫</li>
-            <li><strong>GitHub API</strong>：將數據保存到 GitHub 倉庫，可跨裝置訪問</li>
+            <li><strong>GitHub API</strong>：將數據保存到 GitHub 倉庫（PosenChen/kanban-data），可跨裝置訪問</li>
           </ol>
+          <p className="mt-1">輸入 GitHub Token 後點擊「儲存 Token」，之後每次修改專案都會自動同步到 GitHub。</p>
         </div>
       </div>
     </div>
