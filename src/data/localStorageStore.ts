@@ -76,33 +76,12 @@ export async function writeGitHub(token: string, projects: Project[]): Promise<v
 let cached: Project[] = []
 let useGitHub = false
 
-async function initCache() {
-  const token = localStorage.getItem(STORAGE_KEY_TOKEN) || ''
-  const source = (localStorage.getItem(STORAGE_KEY_SOURCE) as 'local' | 'github') || 'github'
-
-  if (source === 'github' && token.trim().length >= 10) {
-    const projects = await readGitHub(token.trim())
-    if (projects.length > 0) {
-      cached = projects
-      useGitHub = true
-      saveLocal(cached)
-      emitChange()
-      return
-    }
-  }
-
-  // Fallback to LocalStorage
-  cached = loadLocal()
-  if (cached.length === 0) {
-    cached = SAMPLE_PROJECTS_WITH_META
-    saveLocal(cached)
-  }
-  useGitHub = false
-  emitChange()
+// Start with LocalStorage only — no auto GitHub load
+cached = loadLocal()
+if (cached.length === 0) {
+  cached = SAMPLE_PROJECTS_WITH_META
+  saveLocal(cached)
 }
-
-// Initialize async cache on load
-initCache()
 
 function emitChange() {
   window.dispatchEvent(new CustomEvent('kanban:data-change', { detail: cached }))
@@ -190,6 +169,19 @@ export const projectStore = {
     return cached.filter(p => p.parent_id === null)
   },
 
+  // 📥 手動從 GitHub 讀取資料
+  async loadFromGitHub(token: string): Promise<Project[]> {
+    const projects = await readGitHub(token)
+    if (projects.length > 0) {
+      cached = projects
+      useGitHub = true
+      saveLocal(cached)
+      emitChange()
+      return projects
+    }
+    return []
+  },
+
   sync() {
     cached = loadLocal()
     emitChange()
@@ -222,7 +214,7 @@ export function scheduleGitHubSync(token: string | null, force: boolean = false)
 }
 
 export function getStorageSource(): 'local' | 'github' {
-  return (localStorage.getItem(STORAGE_KEY_SOURCE) as 'local' | 'github') || 'github'
+  return (localStorage.getItem(STORAGE_KEY_SOURCE) as 'local' | 'github') || 'local'
 }
 
 export function setStorageSource(source: 'local' | 'github'): void {

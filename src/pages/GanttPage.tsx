@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
+import { projectStore } from '@/data/localStorageStore'
 import { STATUS_CONFIG, type Project } from '@/types/project'
 import { dateToStr } from '@/utils/dateUtils'
 
@@ -192,6 +193,25 @@ function GanttPage() {
   const handleNavigateToSettings = useCallback(() => {
     navigate('/settings')
   }, [navigate])
+
+  // 📥 手動從 GitHub 讀取專案資料
+  const [isLoading, setIsLoading] = useState(false)
+  const handleLoadFromGitHub = useCallback(async () => {
+    const token = localStorage.getItem('kanban_github_token')
+    if (!token || token.trim().length < 10) {
+      alert('尚未設定 GitHub Token')
+      return
+    }
+    setIsLoading(true)
+    try {
+      await projectStore.loadFromGitHub(token.trim())
+      alert('✅ 已從 GitHub 讀取最新專案資料！')
+    } catch (err: unknown) {
+      alert('❌ 讀取失敗：' + (err as Error).message)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
 
   // ── Handlers ──
   const handleDateClick = useCallback((dateStr: string) => {
@@ -462,6 +482,16 @@ function GanttPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
               同步
+            </button>
+            <button
+              onClick={handleLoadFromGitHub}
+              disabled={isLoading}
+              className="flex items-center gap-1 px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium border border-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              {isLoading ? '讀取中...' : '下載 GitHub'}
             </button>
           </div>
         </div>
