@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
 import { STATUS_CONFIG, type Project } from '@/types/project'
 import { dateToStr } from '@/utils/dateUtils'
-import KanbanBoard from '@/pages/KanbanBoard'
 
 // ── Constants ──
 const DAY_WIDTH = 24      // 1 day = 24px
@@ -116,9 +115,6 @@ function GanttPage() {
     setExpandedParents(new Set(rootIds))
   }, [projects])
 
-  // ── View mode ──
-  const [showKanbanBoard, setShowKanbanBoard] = useState(false)
-
   // ── View range ──
   const { dateHeaders, viewEndStr, milestoneDates } = useMemo(() => {
     const startDate = localDate(viewStart)
@@ -189,8 +185,13 @@ function GanttPage() {
   }, [viewStart])
 
   const handleScrollToToday = useCallback(() => {
-    setShowKanbanBoard(prev => !prev)
+    const today = new Date()
+    setViewStart(dateToStr(today))
   }, [])
+
+  const handleNavigateToSettings = useCallback(() => {
+    navigate('/settings')
+  }, [navigate])
 
   // ── Handlers ──
   const handleDateClick = useCallback((dateStr: string) => {
@@ -406,23 +407,6 @@ function GanttPage() {
 
   return (
     <div className="space-y-3">
-      {showKanbanBoard ? (
-        <>
-          <div className="flex items-center justify-between mb-2">
-            <button
-              onClick={() => setShowKanbanBoard(false)}
-              className="flex items-center gap-1 px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm font-medium transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              返回甘特圖
-            </button>
-          </div>
-          <KanbanBoard />
-        </>
-      ) : (
-        <div className="space-y-3">
       {/* Toolbar */}
       <div className="bg-white rounded-lg border border-gray-200 p-3 space-y-3">
         {/* Search + Actions */}
@@ -469,6 +453,16 @@ function GanttPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
               新增
+            </button>
+            <button
+              onClick={handleNavigateToSettings}
+              className="flex items-center gap-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium border border-gray-300 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              同步設定
             </button>
           </div>
         </div>
@@ -721,8 +715,6 @@ function GanttPage() {
           💡 箭頭左右按鈕瀏覽時間軸 · 點擊日期進入日曆視圖 · 點擊專案進入詳細頁面 · 紫色箭頭 = 里程碑
         </div>
       </div>
-        </div>
-      )}
     </div>
   )
 }
