@@ -929,10 +929,25 @@ function GanttPage() {
                 />
               </div>
               {editingActivity && (
-                <div className="pt-1">
+                <div className="flex gap-2 pt-1 text-xs">
+                  <button
+                    onClick={() => {
+                      projectStore.addMilestone({
+                        name: editingActivity.name + 'Q',
+                        date: editingActivity.date,
+                        tags: editingActivity.tags,
+                        description: editingActivity.description,
+                      })
+                      setShowActivityModal(false)
+                      setEditingActivity(null)
+                    }}
+                    className="text-blue-500 hover:text-blue-700 underline"
+                  >
+                    複製這個活動
+                  </button>
                   <button
                     onClick={() => handleDeleteActivity(editingActivity.id)}
-                    className="text-xs text-red-500 hover:text-red-700 underline"
+                    className="text-red-500 hover:text-red-700 underline"
                   >
                     刪除這個活動
                   </button>

@@ -10,7 +10,7 @@ function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
   if (!id) return <div className="flex items-center justify-center h-64 text-gray-400"><p>找不到專案 ID</p></div>
   const navigate = useNavigate()
-  const { getById, update, remove, getByParent, getAll } = useProjects()
+  const { getById, update, remove, getByParent, getAll, add } = useProjects()
 
   const project = getById(id)
   const [showForm, setShowForm] = useState(false)
@@ -118,6 +118,25 @@ function ProjectDetailPage() {
               className="px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600"
             >
               編輯
+            </button>
+            <button
+              onClick={() => {
+                const copyName = project.name + 'Q'
+                add({
+                  name: copyName,
+                  description: project.description,
+                  parent_id: project.parent_id,
+                  start_date: project.start_date,
+                  end_date: project.end_date,
+                  status: project.status,
+                  priority: project.priority,
+                  tags: [...project.tags],
+                  progress: project.progress,
+                })
+              }}
+              className="px-3 py-1.5 text-sm bg-gray-100 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-200"
+            >
+              複製
             </button>
             <button
               onClick={handleDelete}
