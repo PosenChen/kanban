@@ -8,6 +8,8 @@ import { dateToStr } from '@/utils/dateUtils'
 // ── Constants ──
 const DAY_WIDTH = 24      // 1 day = 24px
 const ROW_MIN_HEIGHT = 48 // min height per sub-project group
+const PARENT_BAR_HEIGHT = 22  // parent bar height
+const SUB_GAP = 4             // gap between parent bar and sub-projects
 const SUBROW_HEIGHT = 20  // height per sub-project within a group
 const SIDEBAR_WIDTH = 200
 
@@ -660,9 +662,11 @@ function GanttPage() {
 
                   {/* Sub-project rows (if any) */}
                   {subCount > 0 && (() => {
-                    // Calculate the sub-area within this root row
-                    const subAreaTop = yPos + 4
-                    const subAreaBottom = yPos + ROW_MIN_HEIGHT - 4
+                    // Parent bar sits at the top of the row
+                    const parentY = yPos
+                    // Sub-project area starts after parent bar + gap
+                    const subAreaTop = parentY + PARENT_BAR_HEIGHT + SUB_GAP
+                    const subAreaBottom = yPos + ROW_MIN_HEIGHT
                     const subAreaHeight = subAreaBottom - subAreaTop
                     const subRowH = Math.min(SUBROW_HEIGHT, subAreaHeight / subCount)
                     const totalSubHeight = subRowH * subCount
@@ -719,8 +723,8 @@ function GanttPage() {
                     )
                   })()}
 
-                  {/* Root project bar */}
-                  {renderBar(rootProject, yPos + 6, ROW_MIN_HEIGHT - 12, ROW_MIN_HEIGHT - 16)}
+                  {/* Root project bar — positioned above sub-projects */}
+                  {renderBar(rootProject, yPos, PARENT_BAR_HEIGHT, PARENT_BAR_HEIGHT - 6)}
                 </g>
               )
             })}
