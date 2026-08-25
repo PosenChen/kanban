@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
+import { projectStore } from '@/data/localStorageStore'
 import { getRemainingDays, formatMonthDay, getDayOfWeek, dateToStr } from '@/utils/dateUtils'
 import ProjectCard from '@/components/ProjectCard'
 import { useState } from 'react'
@@ -176,7 +177,7 @@ function DailyPage() {
         </div>
       )}
 
-      {/* Add button */}
+      {/* Add project button */}
       <button
         onClick={() => {
           add({
@@ -195,6 +196,22 @@ function DailyPage() {
         className="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors text-sm"
       >
         + 新增今天的專案
+      </button>
+
+      {/* Add activity button */}
+      <button
+        onClick={() => {
+          projectStore.addMilestone({
+            name: `今天新增的活動`,
+            date: targetDate,
+            tags: ['活動'],
+            description: '',
+          })
+          navigate('/')
+        }}
+        className="w-full py-3 border-2 border-dashed border-purple-300 rounded-xl text-gray-400 hover:border-purple-400 hover:text-purple-500 transition-colors text-sm"
+      >
+        + 新增今天的活動
       </button>
     </div>
   )
