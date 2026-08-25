@@ -51,9 +51,10 @@ function GanttPage() {
 
   // ── View state ──
   const [viewStart, setViewStart] = useState(() => {
-    const firstDate = projects.length
-      ? projects.reduce((min, p) => p.start_date < min ? p.start_date : min, projects[0].start_date)
-      : dateToStr(new Date())
+    if (!projects.length) return dateToStr(new Date())
+    // Include milestones in the view range
+    const allDates = projects.map(p => p.start_date)
+    const firstDate = allDates.reduce((min, d) => (d < min ? d : min), allDates[0])
     return firstDate
   })
 
@@ -629,11 +630,11 @@ function GanttPage() {
                 🚩 里程碑
               </text>
 
-              {/* Milestone event blocks */}
+              {/* Milestone event blocks — positions match date column directly */}
               {milestoneEvents.map((m, idx) => {
                 const mIdx = dateHeaders.findIndex(h => h.dateStr === m.date)
                 if (mIdx < 0) return null
-                const mX = mIdx * DAY_WIDTH + SIDEBAR_WIDTH + 8
+                const mX = mIdx * DAY_WIDTH + 8
                 return (
                   <g key={`me-${m.date}-${idx}`}>
                     <rect
