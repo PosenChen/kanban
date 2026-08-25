@@ -850,32 +850,54 @@ function GanttPage() {
                       fill={rowIdx % 2 === 0 ? '#3B82F6' : '#10B981'}
                     />
                     <text
-                      x={18}
+                      x={36}
                       y={yPos + ROW_MIN_HEIGHT / 2 + 4}
                       className="fill-gray-800 font-medium"
                       fontSize="12"
                     >
                       {rootProject.name}
                     </text>
-                    {/* Expand/collapse arrow */}
+                    {/* Expand/collapse toggle button — clearly visible on the left side */}
                     {subCount > 0 && (
                       <g
                         onClick={(e) => { e.stopPropagation(); toggleExpand(group.projectId) }}
-                        className="cursor-pointer hover:text-blue-500 transition-colors"
-                        style={{ transform: isExpanded ? '' : 'rotate(-90deg)' }}
+                        className="cursor-pointer hover:brightness-110 transition-all"
                       >
+                        {/* Visible button background */}
+                        <rect
+                          x={6}
+                          y={yPos + 10}
+                          width={22}
+                          height={22}
+                          rx={5}
+                          fill={isExpanded ? '#dbeafe' : '#f3f4f6'}
+                          stroke={isExpanded ? '#3b82f6' : '#d1d5db'}
+                          strokeWidth={1}
+                        />
+                        {/* Arrow character — pointing right when collapsed, down when expanded */}
                         <text
-                          x={SIDEBAR_WIDTH - 32}
-                          y={yPos + ROW_MIN_HEIGHT / 2 + 4}
-                          className="fill-gray-400 hover:fill-blue-500"
-                          fontSize="10"
+                          x={17}
+                          y={yPos + 24}
+                          textAnchor="middle"
+                          className="fill-blue-600 font-bold"
+                          fontSize={isExpanded ? "14" : "14"}
                         >
-                          ▶
+                          {isExpanded ? '▼' : '▶'}
                         </text>
+                        {/* Sub-project count badge */}
+                        <rect
+                          x={30}
+                          y={yPos + 11}
+                          width={18}
+                          height={16}
+                          rx={8}
+                          fill={isExpanded ? '#3b82f6' : '#6b7280'}
+                        />
                         <text
-                          x={SIDEBAR_WIDTH - 16}
-                          y={yPos + ROW_MIN_HEIGHT / 2 + 4}
-                          className="fill-gray-500"
+                          x={39}
+                          y={yPos + 22}
+                          textAnchor="middle"
+                          className="fill-white font-bold"
                           fontSize="9"
                         >
                           {subCount}
