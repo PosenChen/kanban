@@ -31,7 +31,10 @@ export async function readGitHub(token: string): Promise<Project[]> {
     })
     if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
     const data: { content: string; sha: string } = await res.json()
-    return JSON.parse(atob(data.content))
+    // Decode: base64 → UTF-8 bytes → string → JSON.parse
+    const bin = Uint8Array.from(atob(data.content), c => c.charCodeAt(0))
+    const text = new TextDecoder('utf-8').decode(bin)
+    return JSON.parse(text)
   } catch {
     return []
   }
@@ -39,7 +42,10 @@ export async function readGitHub(token: string): Promise<Project[]> {
 
 export async function writeGitHub(token: string, projects: Project[]): Promise<void> {
   const json = JSON.stringify(projects, null, 2)
-  const encoded = btoa(unescape(encodeURIComponent(json)))
+  // Encode: string → UTF-8 bytes → base64 (proper for GitHub API)
+  const bytes = new TextEncoder().encode(json)
+  const bin = String.fromCharCode(...bytes)
+  const encoded = btoa(bin)
 
   // Get current SHA
   let sha = ''
