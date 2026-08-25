@@ -431,6 +431,7 @@ function GanttPage() {
         height={rowGroups.length * ROW_MIN_HEIGHT + headerHeight}
         fill="#fef2f2"
         opacity={0.6}
+        pointerEvents="none"
       />
 
       {/* Today label in date header */}
@@ -441,6 +442,7 @@ function GanttPage() {
         height={16}
         rx={4}
         fill="#ef4444"
+        pointerEvents="none"
       />
       <text
         x={todayOffset + DAY_WIDTH / 2}
@@ -448,6 +450,7 @@ function GanttPage() {
         textAnchor="middle"
         className="fill-white font-bold"
         fontSize="8"
+        pointerEvents="none"
       >
         Today
       </text>
