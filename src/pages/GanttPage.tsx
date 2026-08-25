@@ -7,6 +7,8 @@ import { dateToStr } from '@/utils/dateUtils'
 
 // ── Constants ──
 const DAY_WIDTH = 24      // 1 day = 24px
+const FROZEN_COLS = 4     // freeze left 4 date columns = 96px
+const FROZEN_WIDTH = FROZEN_COLS * DAY_WIDTH  // 96px
 const PARENT_ROW_HEIGHT = 24  // parent row height
 const SUB_ROW_HEIGHT = 20      // sub-project row height
 const SIDEBAR_WIDTH = 200
@@ -713,7 +715,7 @@ function GanttPage() {
         </div>
       </div>
 
-      {/* Gantt Chart SVG */}
+      {/* Gantt Chart — frozen sidebar + scrollable area */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         {/* Toolbar: scroll controls + zoom */}
         <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
@@ -747,76 +749,54 @@ function GanttPage() {
           </div>
         </div>
 
-        {/* Gantt Chart SVG */}
-        <div className="overflow-x-auto">
-          <svg
-            width={totalWidth}
-            height={totalGanttHeight + headerHeight}
+        {/* Split layout: frozen left sidebar + scrollable right SVG */}
+        <div className="relative" style={{ height: totalGanttHeight + headerHeight }}>
+          {/* ── Frozen left sidebar (never scrolls) ── */}
+          <div
+            className="absolute left-0 top-0 bg-white"
+            style={{ width: FROZEN_WIDTH, height: totalGanttHeight + headerHeight, overflow: 'hidden' }}
           >
-            {/* Date headers */}
-            {renderDateHeaders(headerHeight)}
-
-            {/* Milestone events row — all milestones consolidated above projects */}
-            <g key={`milestones`}>
-              {/* Milestone row background */}
-              <rect
-                x={0}
-                y={headerHeight}
-                width={totalWidth}
-                height={MILESTONE_ROW_HEIGHT}
-                fill="#faf5ff"
-              />
-
-              {/* Row label */}
-              <text
-                x={8}
-                y={headerHeight + 20}
-                className="fill-gray-500 font-semibold"
-                fontSize="10"
-              >
-                🚩 活動
-              </text>
-
-              {/* Milestone event blocks — horizontally centered on the date column */}
-              {filteredMilestones.map((m, idx) => {
-                const mIdx = dateHeaders.findIndex(h => h.dateStr === m.date)
-                if (mIdx < 0) return null
-                // Column center = mIdx * 24 + 12; rect center = 10; x = 2
-                const mX = mIdx * DAY_WIDTH + 2
-                const colRight = (mIdx + 1) * DAY_WIDTH
-                return (
-                  <g key={`me-${m.id}`}>
-                    <rect
-                      x={mX}
-                      y={headerHeight + 6}
-                      width={20}
-                      height={16}
-                      rx={4}
-                      fill="#A855F7"
-                      opacity={0.9}
-                    />
-                    {/* Right arrow: extends from block center to column right edge */}
-                    <polygon
-                      points={`${mX + 20},${headerHeight + 14} ${mX + 20},${headerHeight + 18} ${colRight},${headerHeight + 16}`}
-                      fill="#A855F7"
-                      opacity={0.9}
-                    />
-                    {/* Name label to the right of the arrow — clickable for edit/delete */}
-                    <text
-                      x={colRight + 4}
-                      y={headerHeight + 18}
-                      className="fill-gray-700 cursor-pointer hover:underline"
-                      fontSize="9"
-                      onClick={() => openEditActivity(m)}
-                    >
-                      {m.name}
-                    </text>
-                  </g>
-                )
-              })}
-            </g>
-
-            {/* All rows — flat list with correct pixel offsets */}
+            {/* Frozen date header background */}
+            <rect
+              x={0} y={0}
+              width={FROZEN_WIDTH}
+              height={headerHeight}
+              fill="#f9fafb"
+            />
+            {/* Frozen date columns (first 4) */}
+            {dateHeaders.slice(0, FROZEN_COLS).map((h, i) => {
+              const xPos = i * DAY_WIDTH
+              const isWeekend = h.dayOfWeek === 0 || h.dayOfWeek === 6
+              const bgColor = isWeekend ? '#f3f4f6' : '#fff'
+              return (
+                <g key={`fz-d-${i}`}>
+                  <rect x={xPos} y={0} width={DAY_WIDTH} height={headerHeight} fill={bgColor} />
+                  <line x1={xPos} y1={0} x2={xPos} y2={headerHeight} stroke={h.isMonthStart ? '#d1d5db' : '#e5e7eb'} strokeWidth={h.isMonthStart ? 1.5 : 0.5} />
+                  {h.isMonthStart && (
+                    <text x={xPos} y={headerHeight - 6} textAnchor="start" className="fill-blue-600 font-bold" fontSize="9">{h.month}月</text>
+                  )}
+                  {h.isMonthStart && (
+                    <text x={xPos + DAY_WIDTH / 2} y={12} textAnchor="middle" className="fill-gray-800 font-bold" fontSize="10">{h.dayNum}</text>
+                  )}
+                  {!h.isMonthStart && (
+                    <text x={xPos + DAY_WIDTH / 2} y={14} textAnchor="middle" className="fill-gray-600" fontSize="8">{h.dayNum}</text>
+                  )}
+                  {/* Left-right arrow separator at frozen boundary */}
+                  {i === FROZEN_COLS - 1 && (
+                    <text x={xPos + DAY_WIDTH / 2} y={headerHeight / 2 + 4} textAnchor="middle" className="fill-gray-400" fontSize="8">◀▶</text>
+                  )}
+                </g>
+              )
+            })}
+            {/* Today line inside frozen area (if today falls in first 4 cols) */}
+            {todayOffset < FROZEN_WIDTH && (
+              <g pointerEvents="none">
+                <line x1={todayOffset} y1={headerHeight} x2={todayOffset} y2={totalGanttHeight + headerHeight} stroke="#ef4444" strokeWidth={2.5} />
+                <rect x={todayOffset + DAY_WIDTH / 2 - 20} y={headerHeight - 2} width={40} height={16} rx={4} fill="#ef4444" />
+                <text x={todayOffset + DAY_WIDTH / 2} y={headerHeight + 10} textAnchor="middle" className="fill-white font-bold" fontSize="8">Today</text>
+              </g>
+            )}
+            {/* Frozen project labels */}
             {(() => {
               const rows: Array<{ project: Project; isRoot: boolean }> = []
               for (const group of filteredGroups) {
@@ -830,8 +810,6 @@ function GanttPage() {
                   }
                 }
               }
-
-              // Compute cumulative y-offset for each row
               let offsetY = headerHeight + MILESTONE_ROW_HEIGHT
               return rows.map((row) => {
                 const project = row.project
@@ -842,70 +820,186 @@ function GanttPage() {
                 const bgEven = Math.round((yPos - headerHeight - MILESTONE_ROW_HEIGHT) / 22) % 2 === 0
 
                 if (isRoot) {
-                  // ── Parent row ──
+                  // Find group for expand/collapse info
+                  const group = filteredGroups.find(g => g.projectId === project.id)
+                  const sc = group?.subProjects.length ?? 0
+                  const exp = expandedParents.has(project.id)
                   return (
-                    <g key={`root-${project.id}`}>
-                      <rect x={0} y={yPos} width={totalWidth} height={rowHeight} fill={bgEven ? '#fff' : '#f9fafb'} />
-                      <g onClick={() => handleProjectClick(project.id)} className="cursor-pointer">
-                        <rect x={0} y={yPos} width={SIDEBAR_WIDTH} height={rowHeight} fill="transparent" />
-                        <rect x={0} y={yPos} width={2} height={rowHeight} fill="#3B82F6" />
-                        <text x={46} y={yPos + rowHeight / 2 + 4} className="fill-gray-800 font-medium" fontSize="12">
-                          {project.name}
-                        </text>
-                        {/* Expand/collapse button */}
-                        {(() => {
-                          const group = filteredGroups.find(g => g.projectId === project.id)
-                          if (!group) return null
-                          const sc = group.subProjects.length
-                          const exp = expandedParents.has(project.id)
-                          return (
-                            <g
-                              onClick={(e) => { e.stopPropagation(); toggleExpand(project.id) }}
-                              className="cursor-pointer hover:brightness-110 transition-all"
-                            >
-                              <rect x={6} y={yPos + 4} width={16} height={16} rx={3} fill={exp ? '#dbeafe' : '#f3f4f6'} stroke={exp ? '#3b82f6' : '#d1d5db'} strokeWidth={1} />
-                              <text x={14} y={yPos + 16} textAnchor="middle" className="fill-blue-600 font-bold" fontSize={14}>
-                                {exp ? '▼' : '▶'}
-                              </text>
-                              <rect x={24} y={yPos + 5} width={18} height={16} rx={8} fill={exp ? '#3b82f6' : '#6b7280'} />
-                              <text x={33} y={yPos + 16} textAnchor="middle" className="fill-white font-bold" fontSize="9">{sc}</text>
-                            </g>
-                          )
-                        })()}
-                        <circle cx={SIDEBAR_WIDTH - 10} cy={yPos + 10} r={4} fill={statusColorMap[project.status] || '#3B82F6'} />
-                        <g className="cursor-pointer" opacity={0.3}
-                          onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-                          onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.3')}
-                          onClick={(e) => { e.stopPropagation(); handleDelete(project.id) }}
-                        >
-                          <circle cx={SIDEBAR_WIDTH - 10} cy={yPos + rowHeight - 8} r={6} fill="none" stroke="#d1d5db" strokeWidth={1} />
-                          <text x={SIDEBAR_WIDTH - 10} y={yPos + rowHeight - 4} textAnchor="middle" className="fill-gray-400 hover:fill-red-500 cursor-pointer" fontSize={8}>×</text>
+                    <g key={`fz-root-${project.id}`}>
+                      <rect x={0} y={yPos} width={FROZEN_WIDTH} height={rowHeight} fill={bgEven ? '#fff' : '#f9fafb'} />
+                      <rect x={0} y={yPos} width={2} height={rowHeight} fill="#3B82F6" />
+                      <text x={6} y={yPos + rowHeight / 2 + 4} className="fill-gray-800 font-medium" fontSize="10">{project.name.length > 6 ? project.name.slice(0, 5) + '…' : project.name}</text>
+                      {sc > 0 && (
+                        <g className="cursor-pointer hover:brightness-110"
+                          onClick={(e) => { e.stopPropagation(); toggleExpand(project.id) }}>
+                          <rect x={6} y={yPos + 4} width={16} height={16} rx={3} fill={exp ? '#dbeafe' : '#f3f4f6'} stroke={exp ? '#3b82f6' : '#d1d5db'} strokeWidth={1} />
+                          <text x={14} y={yPos + 16} textAnchor="middle" className="fill-blue-600 font-bold" fontSize={12}>{exp ? '▼' : '▶'}</text>
+                          <rect x={24} y={yPos + 5} width={16} height={14} rx={7} fill={exp ? '#3b82f6' : '#6b7280'} />
+                          <text x={32} y={yPos + 16} textAnchor="middle" className="fill-white font-bold" fontSize="8">{sc}</text>
                         </g>
-                      </g>
-                      {renderBar(project, yPos, rowHeight, rowHeight - 6)}
+                      )}
                     </g>
                   )
                 }
-
-                // ── Sub-project row ──
                 const sub = project
                 return (
-                  <g key={`sub-${sub.id}`}>
-                    <rect x={0} y={yPos} width={totalWidth} height={rowHeight} fill={bgEven ? '#fff' : '#f9fafb'} />
+                  <g key={`fz-sub-${sub.id}`}>
+                    <rect x={0} y={yPos} width={FROZEN_WIDTH} height={rowHeight} fill={bgEven ? '#fff' : '#f9fafb'} />
                     <rect x={0} y={yPos} width={2} height={rowHeight} fill="#6b7280" />
-                    <text x={6} y={yPos + rowHeight / 2 + 4} className="fill-gray-600" fontSize="11">↳ {sub.name}</text>
-                    <circle cx={SIDEBAR_WIDTH - 10} cy={yPos + 10} r={4} fill={statusColorMap[sub.status] || '#3B82F6'} />
-                    {renderBar(sub, yPos, rowHeight, rowHeight - 6)}
+                    <text x={6} y={yPos + rowHeight / 2 + 4} className="fill-gray-600" fontSize="9">↳ {sub.name.length > 7 ? sub.name.slice(0, 6) + '…' : sub.name}</text>
                   </g>
                 )
               })
             })()}
-          </svg>
+          </div>
+
+          {/* ── Scrollable right area (date headers + gantt bars) ── */}
+          <div className="absolute left-[96px] top-0 right-0 overflow-x-auto overflow-y-hidden">
+            <svg
+              width={totalWidth - FROZEN_WIDTH}
+              height={totalGanttHeight + headerHeight}
+            >
+              {/* Date headers — shift left by FROZEN_WIDTH so columns align */}
+              {(() => {
+                const shiftedHeaders = dateHeaders.slice(FROZEN_COLS)
+                return (
+                  <g>
+                    <rect x={0} y={0} width={totalWidth - FROZEN_WIDTH} height={headerHeight} fill="#f9fafb" />
+                    {shiftedHeaders.map((h, i) => {
+                      const xPos = i * DAY_WIDTH
+                      const isWeekend = h.dayOfWeek === 0 || h.dayOfWeek === 6
+                      const bgColor = isWeekend ? '#f3f4f6' : '#fff'
+                      return (
+                        <g key={`d-${i}`}>
+                          <rect x={xPos} y={0} width={DAY_WIDTH} height={headerHeight} fill={bgColor} />
+                          <line x1={xPos} y1={0} x2={xPos} y2={headerHeight} stroke={h.isMonthStart ? '#d1d5db' : '#e5e7eb'} strokeWidth={h.isMonthStart ? 1.5 : 0.5} />
+                          {h.isMonthStart && (
+                            <text x={xPos} y={headerHeight - 6} textAnchor="start" className="fill-blue-600 font-bold" fontSize="9">{h.month}月</text>
+                          )}
+                          {h.isMonthStart && (
+                            <text x={xPos + DAY_WIDTH / 2} y={12} textAnchor="middle" className="fill-gray-800 font-bold" fontSize="10">{h.dayNum}</text>
+                          )}
+                          {!h.isMonthStart && (
+                            <text x={xPos + DAY_WIDTH / 2} y={14} textAnchor="middle" className="fill-gray-600" fontSize="8">{h.dayNum}</text>
+                          )}
+                          <rect
+                            x={xPos} y={0} width={DAY_WIDTH} height={headerHeight}
+                            fill="transparent"
+                            onClick={() => handleDateClick(h.dateStr)}
+                            className="cursor-pointer"
+                          />
+                        </g>
+                      )
+                    })}
+                    {/* Today line (if today is after frozen area) */}
+                    {todayOffset >= FROZEN_WIDTH && (
+                      <g pointerEvents="none">
+                        <line
+                          x1={todayOffset - FROZEN_WIDTH} y1={headerHeight}
+                          x2={todayOffset - FROZEN_WIDTH} y2={totalGanttHeight + headerHeight}
+                          stroke="#ef4444" strokeWidth={2.5}
+                        />
+                        <rect
+                          x={todayOffset - FROZEN_WIDTH} y={headerHeight - 2}
+                          width={DAY_WIDTH} height={16} rx={4} fill="#fef2f2"
+                        />
+                        <text
+                          x={todayOffset - FROZEN_WIDTH + DAY_WIDTH / 2}
+                          y={headerHeight + 10}
+                          textAnchor="middle"
+                          className="fill-red-600 font-bold"
+                          fontSize="8"
+                        >Today</text>
+                      </g>
+                    )}
+                    {/* Milestone row */}
+                    <g key={`milestones`}>
+                      <rect
+                        x={0}
+                        y={headerHeight}
+                        width={totalWidth - FROZEN_WIDTH}
+                        height={MILESTONE_ROW_HEIGHT}
+                        fill="#faf5ff"
+                      />
+                      {filteredMilestones.map((m) => {
+                        const mIdx = dateHeaders.findIndex(h => h.dateStr === m.date)
+                        if (mIdx < FROZEN_COLS) return null // hidden in frozen area
+                        const localIdx = mIdx - FROZEN_COLS
+                        const mX = localIdx * DAY_WIDTH
+                        const colRight = (localIdx + 1) * DAY_WIDTH
+                        return (
+                          <g key={`me-${m.id}`}>
+                            <rect
+                              x={mX} y={headerHeight + 6}
+                              width={20} height={16} rx={4} fill="#A855F7" opacity={0.9}
+                            />
+                            <polygon
+                              points={`${mX + 20},${headerHeight + 14} ${mX + 20},${headerHeight + 18} ${colRight},${headerHeight + 16}`}
+                              fill="#A855F7" opacity={0.9}
+                            />
+                            <text
+                              x={colRight + 4}
+                              y={headerHeight + 18}
+                              className="fill-gray-700 cursor-pointer hover:underline"
+                              fontSize="9"
+                              onClick={() => openEditActivity(m)}
+                            >
+                              {m.name}
+                            </text>
+                          </g>
+                        )
+                      })}
+                    </g>
+
+                    {/* All project rows with correct pixel offsets */}
+                    {(() => {
+                      const rows: Array<{ project: Project; isRoot: boolean }> = []
+                      for (const group of filteredGroups) {
+                        const rootProject = projects.find(p => p.id === group.projectId)
+                        if (!rootProject) continue
+                        const isExpanded = expandedParents.has(group.projectId)
+                        rows.push({ project: rootProject, isRoot: true })
+                        if (isExpanded) {
+                          for (const s of group.subProjects) {
+                            rows.push({ project: s, isRoot: false })
+                          }
+                        }
+                      }
+                      let offsetY = headerHeight + MILESTONE_ROW_HEIGHT
+                      return rows.map((row) => {
+                        const project = row.project
+                        const isRoot = row.isRoot
+                        const rowHeight = isRoot ? PARENT_ROW_HEIGHT : SUB_ROW_HEIGHT
+                        const yPos = offsetY
+                        offsetY += rowHeight
+
+                        if (isRoot) {
+                          return (
+                            <g key={`root-${project.id}`}>
+                              <rect x={0} y={yPos} width={totalWidth - FROZEN_WIDTH} height={rowHeight} fill="#fff" />
+                              {renderBar(project, yPos, rowHeight, rowHeight - 6)}
+                            </g>
+                          )
+                        }
+                        const sub = project
+                        return (
+                          <g key={`sub-${sub.id}`}>
+                            <rect x={0} y={yPos} width={totalWidth - FROZEN_WIDTH} height={rowHeight} fill="#fff" />
+                            {renderBar(sub, yPos, rowHeight, rowHeight - 6)}
+                          </g>
+                        )
+                      })
+                    })()}
+                  </g>
+                )
+              })()}
+            </svg>
+          </div>
         </div>
 
         {/* Info bar */}
         <div className="px-4 py-2 bg-blue-50 border-t border-blue-200 text-xs text-blue-700">
-          💡 箭頭左右按鈕瀏覽時間軸 · 點擊日期進入日曆視圖 · 點擊專案進入詳細頁面 · 活動列在專案上方
+          💡 左右箭頭按鈕瀏覽時間軸 · 點擊日期進入日曆視圖 · 點擊專案進入詳細頁面 · 活動列在專案上方 · 左側為凍結欄
         </div>
       </div>
 
