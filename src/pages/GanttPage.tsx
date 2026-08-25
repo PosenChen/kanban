@@ -119,18 +119,18 @@ function GanttPage() {
   }, [projects])
 
   // ── View range ──
-  const { dateHeaders, viewEndStr, milestoneDates } = useMemo(() => {
+  const { dateHeaders, viewEndStr, milestoneEvents } = useMemo(() => {
     const startDate = localDate(viewStart)
     // Show enough days for scrolling
     const range = 730 // 2 years
     const endDate = new Date(startDate)
     endDate.setDate(endDate.getDate() + range)
 
-    // Collect milestone dates
-    const milestoneSet = new Set<string>()
+    // Collect milestone events as { date, name }
+    const milestones: { date: string; name: string }[] = []
     projects.forEach(p => {
       if (p.status === 'milestone') {
-        milestoneSet.add(p.start_date)
+        milestones.push({ date: p.start_date, name: p.name })
       }
     })
 
@@ -153,7 +153,7 @@ function GanttPage() {
     return {
       dateHeaders: headers,
       viewEndStr: dateToStr(endDate),
-      milestoneDates: milestoneSet,
+      milestoneEvents: milestones,
     }
   }, [viewStart, projects])
 
@@ -331,10 +331,8 @@ function GanttPage() {
       {dateHeaders.map((h, i) => {
         const xPos = i * DAY_WIDTH
         const isWeekend = h.dayOfWeek === 0 || h.dayOfWeek === 6
-        const isMilestone = milestoneDates.has(h.dateStr)
         let bgColor = '#fff'
         if (isWeekend) bgColor = '#f3f4f6'
-        if (isMilestone) bgColor = '#f3e8ff' // subtle purple for milestone
 
         return (
           <g key={i}>
@@ -418,7 +416,7 @@ function GanttPage() {
         x1={todayOffset}
         y1={headerHeight}
         x2={todayOffset}
-        y2={rowGroups.length * ROW_MIN_HEIGHT + headerHeight}
+        y2={totalGanttHeight}
         stroke="#ef4444"
         strokeWidth={2.5}
       />
@@ -428,7 +426,7 @@ function GanttPage() {
         x={todayOffset}
         y={0}
         width={DAY_WIDTH}
-        height={rowGroups.length * ROW_MIN_HEIGHT + headerHeight}
+        height={totalGanttHeight}
         fill="#fef2f2"
         opacity={0.6}
         pointerEvents="none"
@@ -463,7 +461,8 @@ function GanttPage() {
   // Each root project gets its own row (ROW_MIN_HEIGHT tall)
   // Sub-projects within the same root share the same row area with subrows
   const totalRows = filteredGroups.length
-  const totalGanttHeight = Math.max(totalRows * ROW_MIN_HEIGHT, 200)
+  const MILESTONE_ROW_HEIGHT = 32  // extra row for milestone events
+  const totalGanttHeight = Math.max(totalRows * ROW_MIN_HEIGHT + MILESTONE_ROW_HEIGHT, 200)
 
   return (
     <div className="space-y-3">
@@ -761,30 +760,62 @@ function GanttPage() {
               )
             })}
 
-            {/* Milestone vertical lines (spanning all rows) */}
-            {Array.from(milestoneDates).map(mDate => {
-              const idx = dateHeaders.findIndex(h => h.dateStr === mDate)
-              if (idx < 0) return null
-              const x = idx * DAY_WIDTH + DAY_WIDTH / 2
-              return (
-                <line
-                  key={`mile-${mDate}`}
-                  x1={x}
-                  y1={headerHeight}
-                  x2={x}
-                  y2={headerHeight + totalGanttHeight}
-                  stroke="#c4b5fd"
-                  strokeWidth={2}
-                  strokeDasharray="4 4"
-                />
-              )
-            })}
+            {/* Milestone events row — all milestones consolidated below projects */}
+            <g key={`milestones`}>
+              {/* Milestone row background */}
+              <rect
+                x={0}
+                y={totalRows * ROW_MIN_HEIGHT + headerHeight}
+                width={totalWidth}
+                height={MILESTONE_ROW_HEIGHT}
+                fill="#faf5ff"
+              />
+
+              {/* Row label */}
+              <text
+                x={8}
+                y={totalRows * ROW_MIN_HEIGHT + headerHeight + 20}
+                className="fill-gray-500 font-semibold"
+                fontSize="10"
+              >
+                🚩 里程碑
+              </text>
+
+              {/* Milestone event blocks */}
+              {milestoneEvents.map((m, idx) => {
+                const mIdx = dateHeaders.findIndex(h => h.dateStr === m.date)
+                if (mIdx < 0) return null
+                const mX = mIdx * DAY_WIDTH + SIDEBAR_WIDTH + 8
+                // Each milestone block is 20px wide (almost 1 day)
+                return (
+                  <g key={`me-${m.date}-${idx}`}>
+                    <rect
+                      x={mX}
+                      y={totalRows * ROW_MIN_HEIGHT + headerHeight + 6}
+                      width={20}
+                      height={16}
+                      rx={4}
+                      fill="#A855F7"
+                      opacity={0.9}
+                    />
+                    <text
+                      x={mX + 22}
+                      y={totalRows * ROW_MIN_HEIGHT + headerHeight + 18}
+                      className="fill-gray-700"
+                      fontSize="9"
+                    >
+                      {m.name}
+                    </text>
+                  </g>
+                )
+              })}
+            </g>
           </svg>
         </div>
 
         {/* Info bar */}
         <div className="px-4 py-2 bg-blue-50 border-t border-blue-200 text-xs text-blue-700">
-          💡 箭頭左右按鈕瀏覽時間軸 · 點擊日期進入日曆視圖 · 點擊專案進入詳細頁面 · 紫色箭頭 = 里程碑
+          💡 箭頭左右按鈕瀏覽時間軸 · 點擊日期進入日曆視圖 · 點擊專案進入詳細頁面 · 下方紫色區塊 = 里程碑
         </div>
       </div>
     </div>
