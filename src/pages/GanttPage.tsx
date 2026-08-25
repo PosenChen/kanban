@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
 import { projectStore, setStorageSource } from '@/data/localStorageStore'
-import { STATUS_CONFIG, type Project } from '@/types/project'
+import { STATUS_CONFIG, type Project, type Milestone } from '@/types/project'
 import { dateToStr } from '@/utils/dateUtils'
 
 // ── Constants ──
@@ -30,11 +30,6 @@ function buildRowGroups(projects: Project[]): { projectId: string; subProjects: 
   return groups
 }
 
-/** Get all project IDs that are milestones */
-function milestoneIds(projects: Project[]): Set<string> {
-  return new Set(projects.filter(p => p.status === 'milestone').map(p => p.id))
-}
-
 interface DayHeader {
   dateStr: string
   dayNum: number
@@ -47,6 +42,7 @@ interface DayHeader {
 function GanttPage() {
   const navigate = useNavigate()
   const { projects, add, remove } = useProjects()
+  const [milestones, setMilestones] = useState<Milestone[]>(() => projectStore.getMilestones())
   const rowGroups = useMemo(() => buildRowGroups(projects), [projects])
 
   // ── View state ──
@@ -54,7 +50,9 @@ function GanttPage() {
     if (!projects.length) return dateToStr(new Date())
     // Include milestones in the view range
     const allDates = projects.map(p => p.start_date)
-    const firstDate = allDates.reduce((min, d) => (d < min ? d : min), allDates[0])
+    const milestoneDates = milestones.map(m => m.date)
+    const all = [...allDates, ...milestoneDates]
+    const firstDate = all.reduce((min, d) => (d < min ? d : min), all[0])
     return firstDate
   })
 
@@ -119,21 +117,23 @@ function GanttPage() {
     setExpandedParents(new Set(rootIds))
   }, [projects])
 
+  // Listen for milestone changes
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as Milestone[] | undefined
+      if (detail) setMilestones([...detail])
+    }
+    window.addEventListener('kanban:milestone-change', handler)
+    return () => window.removeEventListener('kanban:milestone-change', handler)
+  }, [])
+
   // ── View range ──
-  const { dateHeaders, viewEndStr, milestoneEvents } = useMemo(() => {
+  const { dateHeaders, viewEndStr } = useMemo(() => {
     const startDate = localDate(viewStart)
     // Show enough days for scrolling
     const range = 730 // 2 years
     const endDate = new Date(startDate)
     endDate.setDate(endDate.getDate() + range)
-
-    // Collect milestone events as { date, name }
-    const milestones: { date: string; name: string }[] = []
-    projects.forEach(p => {
-      if (p.status === 'milestone') {
-        milestones.push({ date: p.start_date, name: p.name })
-      }
-    })
 
     const headers: DayHeader[] = []
     const d = new Date(startDate)
@@ -154,7 +154,6 @@ function GanttPage() {
     return {
       dateHeaders: headers,
       viewEndStr: dateToStr(endDate),
-      milestoneEvents: milestones,
     }
   }, [viewStart, projects])
 
@@ -266,30 +265,6 @@ function GanttPage() {
     const offsetDays = Math.max(0, (startMs - viewStartMs) / 86400000)
     const barWidth = Math.max(barDays * DAY_WIDTH, DAY_WIDTH) // at least 1 day width
     const x = offsetDays * DAY_WIDTH
-
-    // Milestone is a single point — show as an arrow (L-shape)
-    if (project.status === 'milestone') {
-      return (
-        <g key={`bar-${project.id}`}>
-          {/* Arrow symbol (right-angle) at the milestone date */}
-          <path
-            d={`M ${x} ${yPos + 4} L ${x} ${yPos + barHeight - 2} L ${x + 8} ${yPos + barHeight - 2}`}
-            fill="none"
-            stroke={statusColorMap[project.status] || '#A855F7'}
-            strokeWidth={2}
-          />
-          {/* Name label next to arrow */}
-          <text
-            x={x + 12}
-            y={yPos + barHeight / 2 + 2}
-            className="fill-gray-700"
-            fontSize="9"
-          >
-            {project.name}
-          </text>
-        </g>
-      )
-    }
 
     // Regular bar — return a <g> with bar + name label
     const labelX = x + 6
@@ -494,7 +469,6 @@ function GanttPage() {
               <option value="waiting">等待中</option>
               <option value="in_progress">進行中</option>
               <option value="completed">已完成</option>
-              <option value="milestone">里程碑</option>
             </select>
             <select
               value={priorityFilter}
@@ -560,8 +534,8 @@ function GanttPage() {
           <div className="flex items-center gap-3 ml-auto">
             <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-yellow-400"></span>準備中</span>
             <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-blue-500"></span>進行中</span>
+            <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-orange-400"></span>等待中</span>
             <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-green-500"></span>已完成</span>
-            <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-purple-500"></span>里程碑</span>
           </div>
         </div>
       </div>
@@ -631,12 +605,12 @@ function GanttPage() {
               </text>
 
               {/* Milestone event blocks — positions match date column directly */}
-              {milestoneEvents.map((m, idx) => {
+              {milestones.map((m, idx) => {
                 const mIdx = dateHeaders.findIndex(h => h.dateStr === m.date)
                 if (mIdx < 0) return null
                 const mX = mIdx * DAY_WIDTH + 8
                 return (
-                  <g key={`me-${m.date}-${idx}`}>
+                  <g key={`me-${m.id}`}>
                     <rect
                       x={mX}
                       y={headerHeight + 6}

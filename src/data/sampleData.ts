@@ -46,17 +46,6 @@ export const SAMPLE_PROJECTS: Omit<Project, 'id' | 'created_at' | 'updated_at'>[
     progress: 50,
   },
   {
-    name: '招標完成 (里程碑)',
-    description: '完成招標文件提交',
-    parent_id: 'p001',
-    start_date: '2026-11-01',
-    end_date: '2026-11-01',
-    status: 'milestone',
-    priority: 'high',
-    tags: ['採購', '里程碑'],
-    progress: 100,
-  },
-  {
     name: 'TOEIC 備考',
     description: '博士班申請 TOEIC 考試準備',
     parent_id: null,

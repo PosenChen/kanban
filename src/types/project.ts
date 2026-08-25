@@ -1,6 +1,15 @@
-export type ProjectStatus = 'preparation' | 'in_progress' | 'waiting' | 'completed' | 'milestone'
+export type ProjectStatus = 'preparation' | 'in_progress' | 'waiting' | 'completed'
 
 export type ProjectPriority = 'high' | 'medium' | 'low'
+
+export interface Milestone {
+  id: string
+  name: string
+  date: string // YYYY-MM-DD
+  tags: string[]
+  created_at: string
+  updated_at: string
+}
 
 export interface Project {
   id: string
@@ -31,7 +40,6 @@ export const STATUS_CONFIG: Record<ProjectStatus, ProjectStatusLabel> = {
   in_progress: { key: 'in_progress', label: '進行中', color: 'text-blue-700', bgColor: 'bg-blue-500' },
   waiting:     { key: 'waiting',     label: '等待中', color: 'text-orange-700', bgColor: 'bg-orange-400' },
   completed:   { key: 'completed',   label: '已完成', color: 'text-green-700', bgColor: 'bg-green-500' },
-  milestone:   { key: 'milestone',   label: '里程碑', color: 'text-purple-700', bgColor: 'bg-purple-500' },
 }
 
 export type PriorityLabel = {

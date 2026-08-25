@@ -4,7 +4,7 @@ import { projectStore, scheduleGitHubSync, getSyncStatus, getStorageSource, setS
 function SettingsPage() {
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'loading' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
-  const [syncInfo, setSyncInfo] = useState({ useGitHub: false, hasToken: false })
+  const [syncInfo, setSyncInfo] = useState({ hasToken: false })
 
   useEffect(() => {
     setSyncInfo(getSyncStatus())

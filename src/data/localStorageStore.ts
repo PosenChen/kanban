@@ -1,9 +1,26 @@
-import type { Project } from '@/types/project'
+import type { Project, Milestone } from '@/types/project'
 import { SAMPLE_PROJECTS_WITH_META } from './sampleData'
 
 const STORAGE_KEY_DATA = 'kanban_projects'
+const STORAGE_KEY_MILESTONES = 'kanban_milestones'
 const STORAGE_KEY_TOKEN = 'kanban_github_token'
 const STORAGE_KEY_SOURCE = 'kanban_storage_source'
+
+// ── Milestone local storage ──
+
+export function loadMilestones(): Milestone[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_MILESTONES)
+    if (!raw) return []
+    return JSON.parse(raw) as Milestone[]
+  } catch {
+    return []
+  }
+}
+
+export function saveMilestones(milestones: Milestone[]): void {
+  localStorage.setItem(STORAGE_KEY_MILESTONES, JSON.stringify(milestones))
+}
 
 // ── LocalStorage (always active) ──
 
@@ -80,7 +97,10 @@ export async function writeGitHub(token: string, projects: Project[]): Promise<v
 // ── Unified store ──
 
 let cached: Project[] = []
-let useGitHub = false
+let milestones: Milestone[] = []
+
+// Load milestones
+milestones = loadMilestones()
 
 // Start with LocalStorage only — no auto GitHub load
 cached = loadLocal()
@@ -89,8 +109,32 @@ if (cached.length === 0) {
   saveLocal(cached)
 }
 
-function emitChange() {
+// Migrate: convert any project with status='milestone' to milestone objects
+// Note: use string comparison since 'milestone' is no longer a ProjectStatus value
+cached.forEach(p => {
+  if ((p as any).status === 'milestone') {
+    milestones.push({
+      id: p.id,
+      name: p.name,
+      date: p.start_date,
+      tags: p.tags,
+      created_at: p.created_at,
+      updated_at: p.updated_at,
+    })
+    // Remove milestone project from cached projects
+    cached = cached.filter(c => c.id !== p.id)
+  }
+})
+
+// Clean up any remaining milestone-status projects (second pass)
+cached = cached.filter(p => (p as any).status !== 'milestone')
+
+function emitProjectChange() {
   window.dispatchEvent(new CustomEvent('kanban:data-change', { detail: cached }))
+}
+
+function emitMilestoneChange() {
+  window.dispatchEvent(new CustomEvent('kanban:milestone-change', { detail: milestones }))
 }
 
 export const projectStore = {
@@ -144,7 +188,7 @@ export const projectStore = {
     }
     cached = [...cached, newProject]
     saveLocal(cached)
-    emitChange()
+    emitProjectChange()
     return newProject
   },
 
@@ -154,16 +198,25 @@ export const projectStore = {
     const updated = { ...cached[idx], ...updates, updated_at: new Date().toISOString() }
     cached[idx] = updated
     saveLocal(cached)
-    emitChange()
+    emitProjectChange()
     return updated
   },
 
   remove(id: string): boolean {
+    // Check milestones first
+    const mIdx = milestones.findIndex(m => m.id === id)
+    if (mIdx !== -1) {
+      milestones = milestones.filter(m => m.id !== id)
+      saveMilestones(milestones)
+      emitMilestoneChange()
+      return true
+    }
+    // Then projects
     const idx = cached.findIndex(p => p.id === id)
     if (idx === -1) return false
     cached = cached.filter(p => p.id !== id)
     saveLocal(cached)
-    emitChange()
+    emitProjectChange()
     return true
   },
 
@@ -175,22 +228,86 @@ export const projectStore = {
     return cached.filter(p => p.parent_id === null)
   },
 
+  // ── Milestone CRUD ──
+
+  addMilestone(data: Omit<Milestone, 'id' | 'created_at' | 'updated_at'>): Milestone {
+    const now = new Date().toISOString()
+    const newMilestone: Milestone = {
+      ...data,
+      id: `m${Date.now().toString(36)}`,
+      created_at: now,
+      updated_at: now,
+    }
+    milestones = [...milestones, newMilestone]
+    saveMilestones(milestones)
+    emitMilestoneChange()
+    return newMilestone
+  },
+
+  getMilestones(): Milestone[] {
+    return milestones
+  },
+
+  getMilestoneById(id: string): Milestone | undefined {
+    return milestones.find(m => m.id === id)
+  },
+
+  updateMilestone(id: string, updates: Partial<Milestone>): Milestone | undefined {
+    const idx = milestones.findIndex(m => m.id === id)
+    if (idx === -1) return undefined
+    const updated = { ...milestones[idx], ...updates, updated_at: new Date().toISOString() }
+    milestones[idx] = updated
+    saveMilestones(milestones)
+    emitMilestoneChange()
+    return updated
+  },
+
+  removeMilestone(id: string): boolean {
+    const idx = milestones.findIndex(m => m.id === id)
+    if (idx === -1) return false
+    milestones = milestones.filter(m => m.id !== id)
+    saveMilestones(milestones)
+    emitMilestoneChange()
+    return true
+  },
+
   // 📥 手動從 GitHub 讀取資料
   async loadFromGitHub(token: string): Promise<Project[]> {
     const projects = await readGitHub(token)
     if (projects.length > 0) {
-      cached = projects
-      useGitHub = true
+      // Migrate milestone-status projects to milestones
+      const newProjects: Project[] = []
+      for (const p of projects) {
+        if ((p as any).status === 'milestone') {
+          milestones.push({
+            id: p.id,
+            name: p.name,
+            date: p.start_date,
+            tags: p.tags,
+            created_at: p.created_at,
+            updated_at: p.updated_at,
+          })
+          saveMilestones(milestones)
+        } else {
+          // Remove milestone status if present (migration)
+          const proj: Project = { ...p, status: 'preparation' as any }
+          newProjects.push(proj)
+        }
+      }
+      cached = newProjects
+      emitMilestoneChange()
+      emitProjectChange()
       setStorageSource('github')
-      emitChange()
-      return projects
+      return cached
     }
     return []
   },
 
   sync() {
     cached = loadLocal()
-    emitChange()
+    milestones = loadMilestones()
+    emitProjectChange()
+    emitMilestoneChange()
   },
 }
 
@@ -198,6 +315,10 @@ export const projectStore = {
 window.addEventListener('storage', (e) => {
   if (e.key === STORAGE_KEY_DATA) {
     projectStore.sync()
+  }
+  if (e.key === STORAGE_KEY_MILESTONES) {
+    milestones = loadMilestones()
+    emitMilestoneChange()
   }
 })
 
@@ -227,7 +348,7 @@ export function setStorageSource(source: 'local' | 'github'): void {
   localStorage.setItem(STORAGE_KEY_SOURCE, source)
 }
 
-export function getSyncStatus(): { useGitHub: boolean; hasToken: boolean } {
+export function getSyncStatus(): { hasToken: boolean } {
   const token = localStorage.getItem(STORAGE_KEY_TOKEN) || ''
-  return { useGitHub, hasToken: token.trim().length >= 10 }
+  return { hasToken: token.trim().length >= 10 }
 }

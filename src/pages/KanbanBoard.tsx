@@ -4,7 +4,7 @@ import { useProjects } from '@/hooks/useProjects'
 import { STATUS_CONFIG, PRIORITY_CONFIG } from '@/types/project'
 import type { Project, ProjectStatus } from '@/types/project'
 
-// ── Kanban column configuration (exclude milestone — it's only for gantt) ──
+// ── Kanban column configuration (excludes milestone and milestone) ──
 const COLUMNS: { key: 'preparation' | 'waiting' | 'in_progress' | 'completed'; label: string; color: string; borderColor: string }[] = [
   { key: 'preparation', label: '準備中',   color: 'bg-yellow-50',   borderColor: 'border-yellow-400' },
   { key: 'waiting',     label: '等待中',   color: 'bg-orange-50',   borderColor: 'border-orange-400' },
@@ -79,7 +79,6 @@ function KanbanBoard() {
       waiting: [],
       in_progress: [],
       completed: [],
-      milestone: [],
     }
     projects.forEach(project => {
       if (groups[project.status]) {
