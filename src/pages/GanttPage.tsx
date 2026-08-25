@@ -7,10 +7,7 @@ import { dateToStr } from '@/utils/dateUtils'
 
 // ── Constants ──
 const DAY_WIDTH = 24      // 1 day = 24px
-const ROW_MIN_HEIGHT = 48 // min height per sub-project group
-const PARENT_BAR_HEIGHT = 22  // parent bar height
-const SUB_GAP = 4             // gap between parent bar and sub-projects
-const SUBROW_HEIGHT = 20  // height per sub-project within a group
+const ROW_MIN_HEIGHT = 22  // each row (parent or sub-project) is 22px tall
 const SIDEBAR_WIDTH = 200
 
 // Parse a YYYY-MM-DD string as a local-date midnight (not UTC)
@@ -582,9 +579,17 @@ function GanttPage() {
   const headerHeight = 28
 
   // ── Calculate total rows ──
-  // Each root project gets its own row (ROW_MIN_HEIGHT tall)
-  // Sub-projects within the same root share the same row area with subrows
-  const totalRows = filteredGroups.length
+  // Each root project is one row. When expanded, each sub-project is also one row.
+  const totalRows = useMemo(() => {
+    let rows = filteredGroups.length
+    for (const group of filteredGroups) {
+      const isExpanded = expandedParents.has(group.projectId)
+      if (isExpanded) {
+        rows += group.subProjects.length
+      }
+    }
+    return rows
+  }, [filteredGroups, expandedParents])
   const MILESTONE_ROW_HEIGHT = 32  // extra row for milestone events
   const totalGanttHeight = Math.max(totalRows * ROW_MIN_HEIGHT + MILESTONE_ROW_HEIGHT, 200)
 
@@ -809,201 +814,205 @@ function GanttPage() {
               })}
             </g>
 
-            {/* Root project rows — offset below milestone row */}
-            {filteredGroups.map((group, rowIdx) => {
+            {/* All rows — parent rows are always visible; sub-rows appear below their parent when expanded */}
+            {filteredGroups.map((group, parentRowIdx) => {
               const rootProject = projects.find(p => p.id === group.projectId)
               if (!rootProject) return null
-              const yPos = headerHeight + MILESTONE_ROW_HEIGHT + rowIdx * ROW_MIN_HEIGHT
-
               const subCount = group.subProjects.length
               const isExpanded = expandedParents.has(group.projectId)
 
+              // Build a flat list of rows for this group: parent + sub-projects (if expanded)
+              const rows: { project: Project; isRoot: boolean }[] = [
+                { project: rootProject, isRoot: true },
+              ]
+              if (isExpanded) {
+                for (const s of group.subProjects) {
+                  rows.push({ project: s, isRoot: false })
+                }
+              }
+
               return (
                 <g key={group.projectId}>
-                  {/* Row background */}
-                  <rect
-                    x={0}
-                    y={yPos}
-                    width={totalWidth}
-                    height={ROW_MIN_HEIGHT}
-                    fill={rowIdx % 2 === 0 ? '#fff' : '#f9fafb'}
-                  />
+                  {rows.map((row, rowInGroup) => {
+                    const project = row.project
+                    const isRoot = row.isRoot
+                    const yPos = headerHeight + MILESTONE_ROW_HEIGHT + (parentRowIdx + rowInGroup) * ROW_MIN_HEIGHT
+                    const bgEven = (parentRowIdx + rowInGroup) % 2 === 0
 
-                  {/* Sidebar label with expand/collapse toggle */}
-                  <g
-                    onClick={() => handleProjectClick(group.projectId)}
-                    className="cursor-pointer"
-                  >
-                    <rect
-                      x={0}
-                      y={yPos}
-                      width={SIDEBAR_WIDTH}
-                      height={ROW_MIN_HEIGHT}
-                      fill="transparent"
-                    />
-                    {/* Root project row indicator (left border) */}
-                    <rect
-                      x={0}
-                      y={yPos}
-                      width={2}
-                      height={ROW_MIN_HEIGHT}
-                      fill={rowIdx % 2 === 0 ? '#3B82F6' : '#10B981'}
-                    />
-                    <text
-                      x={36}
-                      y={yPos + ROW_MIN_HEIGHT / 2 + 4}
-                      className="fill-gray-800 font-medium"
-                      fontSize="12"
-                    >
-                      {rootProject.name}
-                    </text>
-                    {/* Expand/collapse toggle button — clearly visible on the left side */}
-                    {subCount > 0 && (
-                      <g
-                        onClick={(e) => { e.stopPropagation(); toggleExpand(group.projectId) }}
-                        className="cursor-pointer hover:brightness-110 transition-all"
-                      >
-                        {/* Visible button background */}
-                        <rect
-                          x={6}
-                          y={yPos + 10}
-                          width={22}
-                          height={22}
-                          rx={5}
-                          fill={isExpanded ? '#dbeafe' : '#f3f4f6'}
-                          stroke={isExpanded ? '#3b82f6' : '#d1d5db'}
-                          strokeWidth={1}
-                        />
-                        {/* Arrow character — pointing right when collapsed, down when expanded */}
-                        <text
-                          x={17}
-                          y={yPos + 24}
-                          textAnchor="middle"
-                          className="fill-blue-600 font-bold"
-                          fontSize={isExpanded ? "14" : "14"}
-                        >
-                          {isExpanded ? '▼' : '▶'}
-                        </text>
-                        {/* Sub-project count badge */}
-                        <rect
-                          x={30}
-                          y={yPos + 11}
-                          width={18}
-                          height={16}
-                          rx={8}
-                          fill={isExpanded ? '#3b82f6' : '#6b7280'}
-                        />
-                        <text
-                          x={39}
-                          y={yPos + 22}
-                          textAnchor="middle"
-                          className="fill-white font-bold"
-                          fontSize="9"
-                        >
-                          {subCount}
-                        </text>
-                      </g>
-                    )}
-                    {/* Status dot */}
-                    <circle
-                      cx={SIDEBAR_WIDTH - 10}
-                      cy={yPos + 10}
-                      r={4}
-                      fill={statusColorMap[rootProject.status] || '#3B82F6'}
-                    />
-                    {/* Delete button */}
-                    <g
-                      className="cursor-pointer"
-                      opacity={0.3}
-                      onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-                      onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.3')}
-                      onClick={(e) => { e.stopPropagation(); handleDelete(rootProject.id) }}
-                    >
-                      <circle
-                        cx={SIDEBAR_WIDTH - 10}
-                        cy={yPos + ROW_MIN_HEIGHT - 8}
-                        r={6}
-                        fill="none"
-                        stroke="#d1d5db"
-                        strokeWidth={1}
-                      />
-                      <text
-                        x={SIDEBAR_WIDTH - 10}
-                        y={yPos + ROW_MIN_HEIGHT - 4}
-                        textAnchor="middle"
-                        className="fill-gray-400 hover:fill-red-500 cursor-pointer"
-                        fontSize={8}
-                      >
-                        ×
-                      </text>
-                    </g>
-                  </g>
+                    if (isRoot) {
+                      // ── Parent row ──
+                      return (
+                        <g key={`root-${rootProject.id}`}>
+                          {/* Row background */}
+                          <rect
+                            x={0}
+                            y={yPos}
+                            width={totalWidth}
+                            height={ROW_MIN_HEIGHT}
+                            fill={bgEven ? '#fff' : '#f9fafb'}
+                          />
 
-                  {/* Sub-project rows — only render when expanded */}
-                  {isExpanded && subCount > 0 && (() => {
-                    // Parent bar sits at the top of the row
-                    const parentY = yPos
-                    // Sub-project area starts after parent bar + gap
-                    const subAreaTop = parentY + PARENT_BAR_HEIGHT + SUB_GAP
-                    const subAreaBottom = yPos + ROW_MIN_HEIGHT
-                    const subAreaHeight = subAreaBottom - subAreaTop
-                    const subRowH = Math.min(SUBROW_HEIGHT, subAreaHeight / subCount)
-                    const totalSubHeight = subRowH * subCount
+                          {/* Sidebar label with expand/collapse toggle */}
+                          <g
+                            onClick={() => handleProjectClick(rootProject.id)}
+                            className="cursor-pointer"
+                          >
+                            <rect
+                              x={0}
+                              y={yPos}
+                              width={SIDEBAR_WIDTH}
+                              height={ROW_MIN_HEIGHT}
+                              fill="transparent"
+                            />
+                            {/* Root project row indicator (left border) */}
+                            <rect
+                              x={0}
+                              y={yPos}
+                              width={2}
+                              height={ROW_MIN_HEIGHT}
+                              fill="#3B82F6"
+                            />
+                            <text
+                              x={36}
+                              y={yPos + ROW_MIN_HEIGHT / 2 + 4}
+                              className="fill-gray-800 font-medium"
+                              fontSize="12"
+                            >
+                              {rootProject.name}
+                            </text>
+                            {/* Expand/collapse toggle button */}
+                            {subCount > 0 && (
+                              <g
+                                onClick={(e) => { e.stopPropagation(); toggleExpand(group.projectId) }}
+                                className="cursor-pointer hover:brightness-110 transition-all"
+                              >
+                                {/* Visible button background */}
+                                <rect
+                                  x={6}
+                                  y={yPos + 10}
+                                  width={22}
+                                  height={22}
+                                  rx={5}
+                                  fill={isExpanded ? '#dbeafe' : '#f3f4f6'}
+                                  stroke={isExpanded ? '#3b82f6' : '#d1d5db'}
+                                  strokeWidth={1}
+                                />
+                                {/* Arrow — ▶ when collapsed, ▼ when expanded */}
+                                <text
+                                  x={17}
+                                  y={yPos + 24}
+                                  textAnchor="middle"
+                                  className="fill-blue-600 font-bold"
+                                  fontSize={14}
+                                >
+                                  {isExpanded ? '▼' : '▶'}
+                                </text>
+                                {/* Sub-project count badge */}
+                                <rect
+                                  x={30}
+                                  y={yPos + 11}
+                                  width={18}
+                                  height={16}
+                                  rx={8}
+                                  fill={isExpanded ? '#3b82f6' : '#6b7280'}
+                                />
+                                <text
+                                  x={39}
+                                  y={yPos + 22}
+                                  textAnchor="middle"
+                                  className="fill-white font-bold"
+                                  fontSize="9"
+                                >
+                                  {subCount}
+                                </text>
+                              </g>
+                            )}
+                            {/* Status dot */}
+                            <circle
+                              cx={SIDEBAR_WIDTH - 10}
+                              cy={yPos + 10}
+                              r={4}
+                              fill={statusColorMap[rootProject.status] || '#3B82F6'}
+                            />
+                            {/* Delete button */}
+                            <g
+                              className="cursor-pointer"
+                              opacity={0.3}
+                              onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                              onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.3')}
+                              onClick={(e) => { e.stopPropagation(); handleDelete(rootProject.id) }}
+                            >
+                              <circle
+                                cx={SIDEBAR_WIDTH - 10}
+                                cy={yPos + ROW_MIN_HEIGHT - 8}
+                                r={6}
+                                fill="none"
+                                stroke="#d1d5db"
+                                strokeWidth={1}
+                              />
+                              <text
+                                x={SIDEBAR_WIDTH - 10}
+                                y={yPos + ROW_MIN_HEIGHT - 4}
+                                textAnchor="middle"
+                                className="fill-gray-400 hover:fill-red-500 cursor-pointer"
+                                fontSize={8}
+                              >
+                                ×
+                              </text>
+                            </g>
+                          </g>
 
-                    // For each sub-project, compute its y position
-                    const subBars: React.ReactNode[] = []
-                    for (let i = 0; i < group.subProjects.length; i++) {
-                      const sub = group.subProjects[i]
-                      const subY = subAreaTop + i * subRowH
-
-                      // Sub-project name label
-                      subBars.push(
-                        <text
-                          key={`sublabel-${sub.id}`}
-                          x={SIDEBAR_WIDTH + 4}
-                          y={subY + subRowH / 2 + 3}
-                          className="fill-gray-600"
-                          fontSize="10"
-                        >
-                          ↳ {sub.name}
-                        </text>
-                      )
-
-                      // Sub-project bar
-                      subBars.push(
-                        renderBar(sub, subY, subRowH, Math.max(subRowH - 2, 8))
+                          {/* Root project bar */}
+                          {renderBar(rootProject, yPos, ROW_MIN_HEIGHT, ROW_MIN_HEIGHT - 6)}
+                        </g>
                       )
                     }
 
+                    // ── Sub-project row ──
+                    const sub = project as Project
                     return (
-                      <g key={`subs-${group.projectId}`}>
-                        {/* Sub-project area background */}
+                      <g key={`sub-${sub.id}`}>
+                        {/* Row background */}
                         <rect
-                          x={SIDEBAR_WIDTH}
-                          y={subAreaTop}
-                          width={totalWidth - SIDEBAR_WIDTH}
-                          height={totalSubHeight}
-                          fill="#f9fafb"
+                          x={0}
+                          y={yPos}
+                          width={totalWidth}
+                          height={ROW_MIN_HEIGHT}
+                          fill={bgEven ? '#fff' : '#f9fafb'}
                         />
-                        {/* Sub-project horizontal dividers */}
-                        {group.subProjects.map((_, i) => (
-                          <line
-                            key={`divider-${i}`}
-                            x1={SIDEBAR_WIDTH}
-                            y1={subAreaTop + i * subRowH + subRowH}
-                            x2={totalWidth}
-                            y2={subAreaTop + i * subRowH + subRowH}
-                            stroke="#e5e7eb"
-                            strokeWidth={0.5}
-                          />
-                        ))}
-                        {subBars}
+
+                        {/* Sub-project row indicator (left border) — narrower */}
+                        <rect
+                          x={0}
+                          y={yPos}
+                          width={2}
+                          height={ROW_MIN_HEIGHT}
+                          fill="#6b7280"
+                        />
+
+                        {/* Sub-project label */}
+                        <text
+                          x={6}
+                          y={yPos + ROW_MIN_HEIGHT / 2 + 4}
+                          className="fill-gray-600"
+                          fontSize="11"
+                        >
+                          ↳ {sub.name}
+                        </text>
+
+                        {/* Status dot */}
+                        <circle
+                          cx={SIDEBAR_WIDTH - 10}
+                          cy={yPos + 10}
+                          r={4}
+                          fill={statusColorMap[sub.status] || '#3B82F6'}
+                        />
+
+                        {/* Sub-project bar */}
+                        {renderBar(sub, yPos, ROW_MIN_HEIGHT, ROW_MIN_HEIGHT - 6)}
                       </g>
                     )
-                  })()}
-
-                  {/* Root project bar — positioned above sub-projects */}
-                  {renderBar(rootProject, yPos, PARENT_BAR_HEIGHT, PARENT_BAR_HEIGHT - 6)}
+                  })}
                 </g>
               )
             })}
