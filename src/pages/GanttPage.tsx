@@ -630,11 +630,13 @@ function GanttPage() {
                 🚩 里程碑
               </text>
 
-              {/* Milestone event blocks — positions match date column directly */}
+              {/* Milestone event blocks — horizontally centered on the date column */}
               {milestones.map((m, idx) => {
                 const mIdx = dateHeaders.findIndex(h => h.dateStr === m.date)
                 if (mIdx < 0) return null
-                const mX = mIdx * DAY_WIDTH + 8
+                // Column center = mIdx * 24 + 12; rect center = 10; x = 2
+                const mX = mIdx * DAY_WIDTH + 2
+                const colRight = (mIdx + 1) * DAY_WIDTH
                 return (
                   <g key={`me-${m.id}`}>
                     <rect
@@ -646,8 +648,15 @@ function GanttPage() {
                       fill="#A855F7"
                       opacity={0.9}
                     />
+                    {/* Right arrow: extends from block center to column right edge */}
+                    <polygon
+                      points={`${mX + 20},${headerHeight + 14} ${mX + 20},${headerHeight + 18} ${colRight},${headerHeight + 16}`}
+                      fill="#A855F7"
+                      opacity={0.9}
+                    />
+                    {/* Name label to the right of the arrow */}
                     <text
-                      x={mX + 22}
+                      x={colRight + 4}
                       y={headerHeight + 18}
                       className="fill-gray-700"
                       fontSize="9"
