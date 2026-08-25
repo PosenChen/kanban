@@ -129,6 +129,7 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects }: ProjectFo
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
               >
                 <option value="preparation">準備中</option>
+                <option value="waiting">等待中</option>
                 <option value="in_progress">進行中</option>
                 <option value="completed">已完成</option>
                 <option value="milestone">里程碑</option>

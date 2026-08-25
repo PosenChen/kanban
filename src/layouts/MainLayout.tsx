@@ -21,6 +21,9 @@ function MainLayout() {
               <Link to="/" className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${isActive('/') ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}>
                 甘特圖
               </Link>
+              <Link to="/board" className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${location.pathname === '/board' ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}>
+                看板
+              </Link>
               <Link to="/daily" className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${isActive('/daily') ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}>
                 日曆
               </Link>

@@ -4,12 +4,12 @@ import { useProjects } from '@/hooks/useProjects'
 import { STATUS_CONFIG, PRIORITY_CONFIG } from '@/types/project'
 import type { Project, ProjectStatus } from '@/types/project'
 
-// ── Kanban column configuration ──
-const COLUMNS: { key: ProjectStatus; label: string; color: string; borderColor: string }[] = [
-  { key: 'preparation', label: '準備中', color: 'bg-yellow-50', borderColor: 'border-yellow-400' },
-  { key: 'in_progress', label: '進行中', color: 'bg-blue-50', borderColor: 'border-blue-400' },
-  { key: 'completed',   label: '已完成', color: 'bg-green-50', borderColor: 'border-green-400' },
-  { key: 'milestone',   label: '里程碑', color: 'bg-purple-50', borderColor: 'border-purple-400' },
+// ── Kanban column configuration (exclude milestone — it's only for gantt) ──
+const COLUMNS: { key: 'preparation' | 'waiting' | 'in_progress' | 'completed'; label: string; color: string; borderColor: string }[] = [
+  { key: 'preparation', label: '準備中',   color: 'bg-yellow-50',   borderColor: 'border-yellow-400' },
+  { key: 'waiting',     label: '等待中',   color: 'bg-orange-50',   borderColor: 'border-orange-400' },
+  { key: 'in_progress', label: '進行中',   color: 'bg-blue-50',     borderColor: 'border-blue-400' },
+  { key: 'completed',   label: '已完成',   color: 'bg-green-50',    borderColor: 'border-green-400' },
 ]
 
 function ProjectCard({ project, onEdit }: { project: Project; onEdit: (id: string) => void }) {
@@ -76,6 +76,7 @@ function KanbanBoard() {
   const projectsByStatus = useMemo(() => {
     const groups: Record<ProjectStatus, Project[]> = {
       preparation: [],
+      waiting: [],
       in_progress: [],
       completed: [],
       milestone: [],
@@ -103,7 +104,7 @@ function KanbanBoard() {
 
   // Count projects in each status
   const totalProjects = projects.length
-  const activeProjects = projects.filter(p => p.status === 'in_progress' || p.status === 'preparation').length
+  const activeProjects = projects.filter(p => ['in_progress', 'waiting'].includes(p.status)).length
   const completedProjects = projects.filter(p => p.status === 'completed').length
 
   return (
