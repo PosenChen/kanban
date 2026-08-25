@@ -127,22 +127,51 @@ function GanttPage() {
     return () => window.removeEventListener('kanban:milestone-change', handler)
   }, [])
 
-  // ── Milestone add modal ──
+  // ── Milestone add/edit modal ──
   const [showMilestoneModal, setShowMilestoneModal] = useState(false)
+  const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null)
   const [milestoneName, setMilestoneName] = useState('')
   const [milestoneDate, setMilestoneDate] = useState(dateToStr(new Date()))
 
-  const handleAddMilestone = useCallback(() => {
+  const openAddModal = useCallback(() => {
+    setEditingMilestone(null)
+    setMilestoneName('')
+    setMilestoneDate(dateToStr(new Date()))
+    setShowMilestoneModal(true)
+  }, [])
+
+  const openEditModal = useCallback((m: Milestone) => {
+    setEditingMilestone(m)
+    setMilestoneName(m.name)
+    setMilestoneDate(m.date)
+    setShowMilestoneModal(true)
+  }, [])
+
+  const handleSaveMilestone = useCallback(() => {
     if (!milestoneName.trim()) return
-    projectStore.addMilestone({
-      name: milestoneName.trim(),
-      date: milestoneDate,
-      tags: ['里程碑'],
-    })
+    if (editingMilestone) {
+      projectStore.updateMilestone(editingMilestone.id, {
+        name: milestoneName.trim(),
+        date: milestoneDate,
+      })
+    } else {
+      projectStore.addMilestone({
+        name: milestoneName.trim(),
+        date: milestoneDate,
+        tags: ['里程碑'],
+      })
+    }
     setMilestoneName('')
     setMilestoneDate(dateToStr(new Date()))
     setShowMilestoneModal(false)
-  }, [milestoneName, milestoneDate])
+    setEditingMilestone(null)
+  }, [milestoneName, milestoneDate, editingMilestone])
+
+  const handleDeleteMilestone = useCallback((id: string) => {
+    if (confirm('確定要刪除這個里程碑嗎？')) {
+      projectStore.removeMilestone(id)
+    }
+  }, [])
 
   // ── View range ──
   const { dateHeaders, viewEndStr } = useMemo(() => {
@@ -507,7 +536,7 @@ function GanttPage() {
               新增
             </button>
             <button
-              onClick={() => setShowMilestoneModal(true)}
+              onClick={openAddModal}
               className="flex items-center gap-1 px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 text-sm font-medium border border-purple-600 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -654,12 +683,13 @@ function GanttPage() {
                       fill="#A855F7"
                       opacity={0.9}
                     />
-                    {/* Name label to the right of the arrow */}
+                    {/* Name label to the right of the arrow — clickable for edit/delete */}
                     <text
                       x={colRight + 4}
                       y={headerHeight + 18}
-                      className="fill-gray-700"
+                      className="fill-gray-700 cursor-pointer hover:underline"
                       fontSize="9"
+                      onClick={() => openEditModal(m)}
                     >
                       {m.name}
                     </text>
@@ -828,12 +858,12 @@ function GanttPage() {
         </div>
       </div>
 
-      {/* Add milestone modal */}
+      {/* Add/edit milestone modal */}
       {showMilestoneModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-80">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <span className="text-purple-500">🚩</span> 新增里程碑
+              <span className="text-purple-500">🚩</span> {editingMilestone ? '編輯里程碑' : '新增里程碑'}
             </h3>
             <div className="space-y-3">
               <div>
@@ -856,19 +886,29 @@ function GanttPage() {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                 />
               </div>
+              {editingMilestone && (
+                <div className="pt-1">
+                  <button
+                    onClick={() => handleDeleteMilestone(editingMilestone.id)}
+                    className="text-xs text-red-500 hover:text-red-700 underline"
+                  >
+                    刪除這個里程碑
+                  </button>
+                </div>
+              )}
               <div className="flex gap-2 pt-2">
                 <button
-                  onClick={() => setShowMilestoneModal(false)}
+                  onClick={() => { setShowMilestoneModal(false); setEditingMilestone(null) }}
                   className="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   取消
                 </button>
                 <button
-                  onClick={handleAddMilestone}
+                  onClick={handleSaveMilestone}
                   disabled={!milestoneName.trim()}
                   className="flex-1 px-3 py-2 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  確定
+                  {editingMilestone ? '儲存' : '新增'}
                 </button>
               </div>
             </div>
