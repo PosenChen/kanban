@@ -863,12 +863,12 @@ function GanttPage() {
                               onClick={(e) => { e.stopPropagation(); toggleExpand(project.id) }}
                               className="cursor-pointer hover:brightness-110 transition-all"
                             >
-                              <rect x={6} y={yPos + 10} width={22} height={22} rx={5} fill={exp ? '#dbeafe' : '#f3f4f6'} stroke={exp ? '#3b82f6' : '#d1d5db'} strokeWidth={1} />
-                              <text x={17} y={yPos + 24} textAnchor="middle" className="fill-blue-600 font-bold" fontSize={14}>
+                              <rect x={6} y={yPos + 4} width={16} height={16} rx={3} fill={exp ? '#dbeafe' : '#f3f4f6'} stroke={exp ? '#3b82f6' : '#d1d5db'} strokeWidth={1} />
+                              <text x={14} y={yPos + 16} textAnchor="middle" className="fill-blue-600 font-bold" fontSize={14}>
                                 {exp ? '▼' : '▶'}
                               </text>
-                              <rect x={30} y={yPos + 11} width={18} height={16} rx={8} fill={exp ? '#3b82f6' : '#6b7280'} />
-                              <text x={39} y={yPos + 22} textAnchor="middle" className="fill-white font-bold" fontSize="9">{sc}</text>
+                              <rect x={24} y={yPos + 5} width={18} height={16} rx={8} fill={exp ? '#3b82f6' : '#6b7280'} />
+                              <text x={33} y={yPos + 16} textAnchor="middle" className="fill-white font-bold" fontSize="9">{sc}</text>
                             </g>
                           )
                         })()}
