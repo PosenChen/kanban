@@ -61,7 +61,19 @@ function GanttPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
+
+  // ── Expanded state ──
+  // Start empty: all parent projects are collapsed by default
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set())
+
+  const toggleExpand = useCallback((parentId: string) => {
+    setExpandedParents(prev => {
+      const next = new Set(prev)
+      if (next.has(parentId)) next.delete(parentId)
+      else next.add(parentId)
+      return next
+    })
+  }, [])
 
   // ── Filtering ──
   const filteredList = useMemo(() => {
@@ -103,15 +115,6 @@ function GanttPage() {
     setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
   }, [])
 
-  const toggleExpand = useCallback((parentId: string) => {
-    setExpandedParents(prev => {
-      const next = new Set(prev)
-      if (next.has(parentId)) next.delete(parentId)
-      else next.add(parentId)
-      return next
-    })
-  }, [])
-
   // Filter milestones by selectedTags
   const filteredMilestones = useMemo(() => {
     let list = milestones
@@ -121,11 +124,7 @@ function GanttPage() {
     return list
   }, [milestones, selectedTags])
 
-  // Auto-expand root projects
-  useEffect(() => {
-    const rootIds = projects.filter(p => p.parent_id === null).map(p => p.id)
-    setExpandedParents(new Set(rootIds))
-  }, [projects])
+  // No auto-expand: user controls which parents to expand
 
   // Listen for milestone changes
   useEffect(() => {
@@ -816,8 +815,8 @@ function GanttPage() {
               if (!rootProject) return null
               const yPos = headerHeight + MILESTONE_ROW_HEIGHT + rowIdx * ROW_MIN_HEIGHT
 
-              // Sub-project count (excluding root)
               const subCount = group.subProjects.length
+              const isExpanded = expandedParents.has(group.projectId)
 
               return (
                 <g key={group.projectId}>
@@ -830,7 +829,7 @@ function GanttPage() {
                     fill={rowIdx % 2 === 0 ? '#fff' : '#f9fafb'}
                   />
 
-                  {/* Sidebar label (root project name) */}
+                  {/* Sidebar label with expand/collapse toggle */}
                   <g
                     onClick={() => handleProjectClick(group.projectId)}
                     className="cursor-pointer"
@@ -851,13 +850,38 @@ function GanttPage() {
                       fill={rowIdx % 2 === 0 ? '#3B82F6' : '#10B981'}
                     />
                     <text
-                      x={6}
+                      x={18}
                       y={yPos + ROW_MIN_HEIGHT / 2 + 4}
                       className="fill-gray-800 font-medium"
                       fontSize="12"
                     >
                       {rootProject.name}
                     </text>
+                    {/* Expand/collapse arrow */}
+                    {subCount > 0 && (
+                      <g
+                        onClick={(e) => { e.stopPropagation(); toggleExpand(group.projectId) }}
+                        className="cursor-pointer hover:text-blue-500 transition-colors"
+                        style={{ transform: isExpanded ? '' : 'rotate(-90deg)' }}
+                      >
+                        <text
+                          x={SIDEBAR_WIDTH - 32}
+                          y={yPos + ROW_MIN_HEIGHT / 2 + 4}
+                          className="fill-gray-400 hover:fill-blue-500"
+                          fontSize="10"
+                        >
+                          ▶
+                        </text>
+                        <text
+                          x={SIDEBAR_WIDTH - 16}
+                          y={yPos + ROW_MIN_HEIGHT / 2 + 4}
+                          className="fill-gray-500"
+                          fontSize="9"
+                        >
+                          {subCount}
+                        </text>
+                      </g>
+                    )}
                     {/* Status dot */}
                     <circle
                       cx={SIDEBAR_WIDTH - 10}
@@ -893,8 +917,8 @@ function GanttPage() {
                     </g>
                   </g>
 
-                  {/* Sub-project rows (if any) */}
-                  {subCount > 0 && (() => {
+                  {/* Sub-project rows — only render when expanded */}
+                  {isExpanded && subCount > 0 && (() => {
                     // Parent bar sits at the top of the row
                     const parentY = yPos
                     // Sub-project area starts after parent bar + gap
