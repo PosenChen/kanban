@@ -253,8 +253,14 @@ function GanttPage() {
 
     if (endMs < viewStartMs || startMs > viewEndMs) return null
 
+    // Bar width = project's own duration, clamped to visible range
+    const projectDuration = Math.max(0, (endMs - startMs) / 86400000)
+    // Clamp bar to visible window
+    const clampedStart = Math.max(startMs, viewStartMs)
+    const clampedEnd = Math.min(endMs, viewEndMs)
+    const barDays = Math.max(0, (clampedEnd - clampedStart) / 86400000)
+    // X offset = position from viewStart to project start
     const offsetDays = Math.max(0, (startMs - viewStartMs) / 86400000)
-    const barDays = Math.min((endMs - viewStartMs), (viewEndMs - viewStartMs)) / 86400000
     const barWidth = Math.max(barDays * DAY_WIDTH, DAY_WIDTH) // at least 1 day width
     const x = offsetDays * DAY_WIDTH
 
