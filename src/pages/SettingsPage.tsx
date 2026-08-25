@@ -12,9 +12,11 @@ function SettingsPage() {
 
   const handleExport = () => {
     const raw = localStorage.getItem('kanban_projects')
-    if (!raw) return
-    const data = JSON.parse(raw)
-    const json = JSON.stringify(data, null, 2)
+    const milestonesRaw = localStorage.getItem('kanban_milestones')
+    const projects = raw ? JSON.parse(raw) : []
+    const milestones = milestonesRaw ? JSON.parse(milestonesRaw) : []
+    const backup = { projects, milestones }
+    const json = JSON.stringify(backup, null, 2)
     const blob = new Blob([json], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -35,9 +37,18 @@ function SettingsPage() {
       reader.onload = () => {
         try {
           const data = JSON.parse(reader.result as string)
-          if (Array.isArray(data) && data.length > 0 && data[0].id && data[0].name) {
-            if (!confirm(`匯入 ${data.length} 個專案？這會覆蓋現有資料。`)) return
-            localStorage.setItem('kanban_projects', JSON.stringify(data))
+          // Accept { projects: [...], milestones: [...] } or legacy plain [... ]
+          const projects = Array.isArray(data.projects) ? data.projects : data
+          if (projects.length > 0 && projects[0].id && projects[0].name) {
+            let confirmMsg = `匯入 ${projects.length} 個專案？`
+            if (Array.isArray(data.milestones)) {
+              confirmMsg += `\n匯入 ${data.milestones.length} 個活動？`
+            }
+            if (!confirm(confirmMsg)) return
+            localStorage.setItem('kanban_projects', JSON.stringify(projects))
+            if (Array.isArray(data.milestones)) {
+              localStorage.setItem('kanban_milestones', JSON.stringify(data.milestones))
+            }
             window.location.reload()
           } else { alert('檔案格式不正確') }
         } catch { alert('無法讀取檔案') }

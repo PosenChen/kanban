@@ -6,6 +6,9 @@ const STORAGE_KEY_MILESTONES = 'kanban_milestones'
 const STORAGE_KEY_TOKEN = 'kanban_github_token'
 const STORAGE_KEY_SOURCE = 'kanban_storage_source'
 
+const GITHUB_PROJECTS_PATH = 'data/projects.json'
+const GITHUB_MILESTONES_PATH = 'data/milestones.json'
+
 // ── Milestone local storage ──
 
 export function loadMilestones(): Milestone[] {
@@ -40,15 +43,14 @@ export function saveLocal(projects: Project[]): void {
 
 // ── GitHub API ──
 
-export async function readGitHub(token: string): Promise<Project[]> {
+async function readGitHubFile(token: string, filePath: string): Promise<unknown[]> {
   try {
-    const res = await fetch('https://api.github.com/repos/PosenChen/kanban-data/contents/data/projects.json', {
+    const res = await fetch(`https://api.github.com/repos/PosenChen/kanban-data/contents/${filePath}`, {
       headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' },
       signal: AbortSignal.timeout(15000),
     })
-    if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
+    if (!res.ok) throw new Error(`GitHub API error for ${filePath}: ${res.status}`)
     const data: { content: string; sha: string } = await res.json()
-    // Decode: base64 → UTF-8 bytes → string → JSON.parse
     const bin = Uint8Array.from(atob(data.content), c => c.charCodeAt(0))
     const text = new TextDecoder('utf-8').decode(bin)
     return JSON.parse(text)
@@ -57,27 +59,24 @@ export async function readGitHub(token: string): Promise<Project[]> {
   }
 }
 
-export async function writeGitHub(token: string, projects: Project[]): Promise<void> {
-  const json = JSON.stringify(projects, null, 2)
-  // Encode: string → UTF-8 bytes → base64 (proper for GitHub API)
+async function writeGitHubFile(token: string, filePath: string, data: unknown[], sha: string = ''): Promise<void> {
+  const json = JSON.stringify(data, null, 2)
   const bytes = new TextEncoder().encode(json)
   const bin = String.fromCharCode(...bytes)
   const encoded = btoa(bin)
 
-  // Get current SHA
-  let sha = ''
   try {
-    const res = await fetch('https://api.github.com/repos/PosenChen/kanban-data/contents/data/projects.json', {
+    const res = await fetch(`https://api.github.com/repos/PosenChen/kanban-data/contents/${filePath}`, {
       headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' },
       signal: AbortSignal.timeout(10000),
     })
     if (res.ok) {
-      const data: { sha: string } = await res.json()
-      sha = data.sha
+      const d: { sha: string } = await res.json()
+      sha = d.sha
     }
   } catch { /* no file yet */ }
 
-  await fetch('https://api.github.com/repos/PosenChen/kanban-data/contents/data/projects.json', {
+  await fetch(`https://api.github.com/repos/PosenChen/kanban-data/contents/${filePath}`, {
     method: 'PUT',
     headers: {
       Authorization: `token ${token}`,
@@ -85,13 +84,28 @@ export async function writeGitHub(token: string, projects: Project[]): Promise<v
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      message: 'Update projects via Kanban board',
+      message: `Update ${filePath} via Kanban board`,
       content: encoded,
       sha,
       branch: 'main',
     }),
     signal: AbortSignal.timeout(15000),
   })
+}
+
+export async function readGitHub(token: string): Promise<Project[]> {
+  return readGitHubFile(token, GITHUB_PROJECTS_PATH) as Promise<Project[]>
+}
+
+export async function writeGitHub(token: string, projects: Project[], milestones: Milestone[]): Promise<void> {
+  // Write projects
+  await writeGitHubFile(token, GITHUB_PROJECTS_PATH, projects)
+  // Write milestones
+  await writeGitHubFile(token, GITHUB_MILESTONES_PATH, milestones)
+}
+
+export async function readMilestonesGitHub(token: string): Promise<Milestone[]> {
+  return readGitHubFile(token, GITHUB_MILESTONES_PATH) as Promise<Milestone[]>
 }
 
 // ── Unified store ──
@@ -274,7 +288,9 @@ export const projectStore = {
   // 📥 手動從 GitHub 讀取資料
   async loadFromGitHub(token: string): Promise<Project[]> {
     const projects = await readGitHub(token)
-    if (projects.length > 0) {
+    const loadedMilestones = await readMilestonesGitHub(token)
+
+    if (projects.length > 0 || loadedMilestones.length > 0) {
       // Migrate milestone-status projects to activities
       const newProjects: Project[] = []
       for (const p of projects) {
@@ -295,6 +311,14 @@ export const projectStore = {
         }
       }
       cached = newProjects
+      // Merge loaded milestones (don't duplicate IDs)
+      const existingIds = new Set(milestones.map(m => m.id))
+      for (const m of loadedMilestones) {
+        if (!existingIds.has(m.id)) {
+          milestones.push(m)
+        }
+      }
+      saveMilestones(milestones)
       emitMilestoneChange()
       emitProjectChange()
       setStorageSource('github')
@@ -332,7 +356,7 @@ export function scheduleGitHubSync(token: string | null, force: boolean = false)
 
   syncTimer = setTimeout(async () => {
     try {
-      await writeGitHub(token.trim(), cached)
+      await writeGitHub(token.trim(), cached, milestones)
       console.log('✅ Synced to GitHub')
     } catch (err: unknown) {
       console.warn('GitHub sync failed:', err)

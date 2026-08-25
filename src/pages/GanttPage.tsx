@@ -132,11 +132,15 @@ function GanttPage() {
   const [editingActivity, setEditingActivity] = useState<Milestone | null>(null)
   const [activityName, setActivityName] = useState('')
   const [activityDate, setActivityDate] = useState(dateToStr(new Date()))
+  const [activityTags, setActivityTags] = useState<string[]>(['活動'])
+  const [activityDesc, setActivityDesc] = useState('')
 
   const openAddActivity = useCallback(() => {
     setEditingActivity(null)
     setActivityName('')
     setActivityDate(dateToStr(new Date()))
+    setActivityTags(['活動'])
+    setActivityDesc('')
     setShowActivityModal(true)
   }, [])
 
@@ -144,6 +148,8 @@ function GanttPage() {
     setEditingActivity(m)
     setActivityName(m.name)
     setActivityDate(m.date)
+    setActivityTags(m.tags || ['活動'])
+    setActivityDesc(m.description || '')
     setShowActivityModal(true)
   }, [])
 
@@ -153,19 +159,24 @@ function GanttPage() {
       projectStore.updateMilestone(editingActivity.id, {
         name: activityName.trim(),
         date: activityDate,
+        tags: activityTags,
+        description: activityDesc.trim() || undefined,
       })
     } else {
       projectStore.addMilestone({
         name: activityName.trim(),
         date: activityDate,
-        tags: ['活動'],
+        tags: activityTags,
+        description: activityDesc.trim() || undefined,
       })
     }
     setActivityName('')
     setActivityDate(dateToStr(new Date()))
+    setActivityTags(['活動'])
+    setActivityDesc('')
     setShowActivityModal(false)
     setEditingActivity(null)
-  }, [activityName, activityDate, editingActivity])
+  }, [activityName, activityDate, activityTags, activityDesc, editingActivity])
 
   const handleDeleteActivity = useCallback((id: string) => {
     if (confirm('確定要刪除這個活動嗎？')) {
@@ -884,6 +895,26 @@ function GanttPage() {
                   value={activityDate}
                   onChange={e => setActivityDate(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">標籤（以逗號分隔，例如：招標,財務,開標）</label>
+                <input
+                  type="text"
+                  value={activityTags.join('、')}
+                  onChange={e => setActivityTags(e.target.value.split('、').map(t => t.trim()).filter(Boolean))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="例：招標、財務"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">說明 / 備註</label>
+                <textarea
+                  value={activityDesc}
+                  onChange={e => setActivityDesc(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none"
+                  rows={3}
+                  placeholder="輸入活動說明或備註（選填）"
                 />
               </div>
               {editingActivity && (

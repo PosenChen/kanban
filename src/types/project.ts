@@ -7,6 +7,7 @@ export interface Milestone {
   name: string
   date: string // YYYY-MM-DD
   tags: string[]
+  description?: string
   created_at: string
   updated_at: string
 }
