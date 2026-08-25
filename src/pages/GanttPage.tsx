@@ -95,8 +95,9 @@ function GanttPage() {
   const allTags = useMemo(() => {
     const tagSet = new Set<string>()
     projects.forEach(p => p.tags.forEach(t => tagSet.add(t)))
+    milestones.forEach(m => m.tags.forEach(t => tagSet.add(t)))
     return Array.from(tagSet).sort()
-  }, [projects])
+  }, [projects, milestones])
 
   const toggleTag = useCallback((tag: string) => {
     setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
@@ -110,6 +111,15 @@ function GanttPage() {
       return next
     })
   }, [])
+
+  // Filter milestones by selectedTags
+  const filteredMilestones = useMemo(() => {
+    let list = milestones
+    if (selectedTags.length > 0) {
+      list = list.filter(m => m.tags.some(t => selectedTags.includes(t)))
+    }
+    return list
+  }, [milestones, selectedTags])
 
   // Auto-expand root projects
   useEffect(() => {
@@ -328,7 +338,7 @@ function GanttPage() {
     const labelFit = barWidth > 40
     return (
       <g key={`bar-${project.id}`}>
-        {/* Gantt bar */}
+        {/* Gantt bar — pointerEvents=none so sidebar label click passes through */}
         <rect
           x={x}
           y={yPos + 2}
@@ -339,6 +349,7 @@ function GanttPage() {
           fill={statusColorMap[project.status] || '#3B82F6'}
           className="cursor-pointer hover:opacity-90 transition-opacity"
           onClick={() => handleProjectClick(project.id)}
+          style={{ pointerEvents: 'none' }}
         />
         {/* Project name label next to bar (always visible) */}
         {labelFit && (
@@ -671,7 +682,7 @@ function GanttPage() {
               </text>
 
               {/* Milestone event blocks — horizontally centered on the date column */}
-              {milestones.map((m, idx) => {
+              {filteredMilestones.map((m, idx) => {
                 const mIdx = dateHeaders.findIndex(h => h.dateStr === m.date)
                 if (mIdx < 0) return null
                 // Column center = mIdx * 24 + 12; rect center = 10; x = 2
