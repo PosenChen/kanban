@@ -1,13 +1,15 @@
-import type { Project, Milestone } from '@/types/project'
+import type { Project, Milestone, Todo } from '@/types/project'
 import { SAMPLE_PROJECTS_WITH_META } from './sampleData'
 
 const STORAGE_KEY_DATA = 'kanban_projects'
 const STORAGE_KEY_MILESTONES = 'kanban_milestones'
+const STORAGE_KEY_TODOS = 'kanban_todos'
 const STORAGE_KEY_TOKEN = 'kanban_github_token'
 const STORAGE_KEY_SOURCE = 'kanban_storage_source'
 
 const GITHUB_PROJECTS_PATH = 'data/projects.json'
 const GITHUB_MILESTONES_PATH = 'data/milestones.json'
+const GITHUB_TODOS_PATH = 'data/todos.json'
 
 // ── Milestone local storage ──
 
@@ -23,6 +25,22 @@ export function loadMilestones(): Milestone[] {
 
 export function saveMilestones(milestones: Milestone[]): void {
   localStorage.setItem(STORAGE_KEY_MILESTONES, JSON.stringify(milestones))
+}
+
+// ── Todo local storage ──
+
+function loadTodos(): Todo[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_TODOS)
+    if (!raw) return []
+    return JSON.parse(raw) as Todo[]
+  } catch {
+    return []
+  }
+}
+
+function saveTodos(todos: Todo[]): void {
+  localStorage.setItem(STORAGE_KEY_TODOS, JSON.stringify(todos))
 }
 
 // ── LocalStorage (always active) ──
@@ -97,24 +115,33 @@ export async function readGitHub(token: string): Promise<Project[]> {
   return readGitHubFile(token, GITHUB_PROJECTS_PATH) as Promise<Project[]>
 }
 
-export async function writeGitHub(token: string, projects: Project[], milestones: Milestone[]): Promise<void> {
+export async function writeGitHub(token: string, projects: Project[], milestones: Milestone[], todos: Todo[]): Promise<void> {
   // Write projects
   await writeGitHubFile(token, GITHUB_PROJECTS_PATH, projects)
   // Write milestones
   await writeGitHubFile(token, GITHUB_MILESTONES_PATH, milestones)
+  // Write todos
+  await writeGitHubFile(token, GITHUB_TODOS_PATH, todos)
 }
 
 export async function readMilestonesGitHub(token: string): Promise<Milestone[]> {
   return readGitHubFile(token, GITHUB_MILESTONES_PATH) as Promise<Milestone[]>
 }
 
+export async function readTodosGitHub(token: string): Promise<Todo[]> {
+  return readGitHubFile(token, GITHUB_TODOS_PATH) as Promise<Todo[]>
+}
+
 // ── Unified store ──
 
 let cached: Project[] = []
 let milestones: Milestone[] = []
+let todos: Todo[] = []
 
 // Load milestones
 milestones = loadMilestones()
+// Load todos
+todos = loadTodos()
 
 // Start with LocalStorage only — no auto GitHub load
 cached = loadLocal()
@@ -149,6 +176,10 @@ function emitProjectChange() {
 
 function emitMilestoneChange() {
   window.dispatchEvent(new CustomEvent('kanban:milestone-change', { detail: milestones }))
+}
+
+function emitTodoChange() {
+  window.dispatchEvent(new CustomEvent('kanban:todo-change', { detail: todos }))
 }
 
 export const projectStore = {
@@ -285,6 +316,45 @@ export const projectStore = {
     return true
   },
 
+  // ── Todo CRUD ──
+
+  addTodo(data: Omit<Todo, 'id' | 'created_at' | 'updated_at'>): Todo {
+    const now = new Date().toISOString()
+    const newTodo: Todo = {
+      ...data,
+      id: `t${Date.now().toString(36)}`,
+      created_at: now,
+      updated_at: now,
+    }
+    todos = [...todos, newTodo]
+    saveTodos(todos)
+    emitTodoChange()
+    return newTodo
+  },
+
+  getTodos(): Todo[] {
+    return todos
+  },
+
+  updateTodo(id: string, updates: Partial<Todo>): Todo | undefined {
+    const idx = todos.findIndex(t => t.id === id)
+    if (idx === -1) return undefined
+    const updated = { ...todos[idx], ...updates, updated_at: new Date().toISOString() }
+    todos[idx] = updated
+    saveTodos(todos)
+    emitTodoChange()
+    return updated
+  },
+
+  removeTodo(id: string): boolean {
+    const idx = todos.findIndex(t => t.id === id)
+    if (idx === -1) return false
+    todos = todos.filter(t => t.id !== id)
+    saveTodos(todos)
+    emitTodoChange()
+    return true
+  },
+
   // 📥 手動從 GitHub 讀取資料
   async loadFromGitHub(token: string): Promise<Project[]> {
     const projects = await readGitHub(token)
@@ -320,9 +390,34 @@ export const projectStore = {
       }
       saveMilestones(milestones)
       emitMilestoneChange()
+
+      // Load todos from GitHub
+      const loadedTodos = await readTodosGitHub(token)
+      const existingTodoIds = new Set(todos.map(t => t.id))
+      for (const t of loadedTodos) {
+        if (!existingTodoIds.has(t.id)) {
+          todos.push(t)
+        }
+      }
+      saveTodos(todos)
+      emitTodoChange()
+
       emitProjectChange()
       setStorageSource('github')
       return cached
+    }
+    // Also try loading todos even if no projects
+    const loadedTodos2 = await readTodosGitHub(token)
+    if (loadedTodos2.length > 0) {
+      const existingTodoIds2 = new Set(todos.map(t => t.id))
+      for (const t of loadedTodos2) {
+        if (!existingTodoIds2.has(t.id)) {
+          todos.push(t)
+        }
+      }
+      saveTodos(todos)
+      emitTodoChange()
+      setStorageSource('github')
     }
     return []
   },
@@ -330,8 +425,10 @@ export const projectStore = {
   sync() {
     cached = loadLocal()
     milestones = loadMilestones()
+    todos = loadTodos()
     emitProjectChange()
     emitMilestoneChange()
+    emitTodoChange()
   },
 }
 
@@ -343,6 +440,10 @@ window.addEventListener('storage', (e) => {
   if (e.key === STORAGE_KEY_MILESTONES) {
     milestones = loadMilestones()
     emitMilestoneChange()
+  }
+  if (e.key === STORAGE_KEY_TODOS) {
+    todos = loadTodos()
+    emitTodoChange()
   }
 })
 
@@ -356,7 +457,7 @@ export function scheduleGitHubSync(token: string | null, force: boolean = false)
 
   syncTimer = setTimeout(async () => {
     try {
-      await writeGitHub(token.trim(), cached, milestones)
+      await writeGitHub(token.trim(), cached, milestones, todos)
       console.log('✅ Synced to GitHub')
     } catch (err: unknown) {
       console.warn('GitHub sync failed:', err)

@@ -54,3 +54,13 @@ export const PRIORITY_CONFIG: Record<ProjectPriority, PriorityLabel> = {
   medium:  { key: 'medium',  label: '中',    color: 'text-yellow-600 bg-yellow-100' },
   low:     { key: 'low',     label: '低',    color: 'text-gray-500 bg-gray-100' },
 }
+
+export interface Todo {
+  id: string
+  name: string
+  priority: ProjectPriority
+  description?: string
+  completed: boolean
+  created_at: string
+  updated_at: string
+}

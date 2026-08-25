@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
 import { projectStore, setStorageSource } from '@/data/localStorageStore'
-import { STATUS_CONFIG, type Project, type Milestone } from '@/types/project'
+import { STATUS_CONFIG, type Project, type Milestone, type Todo, type ProjectPriority } from '@/types/project'
 import { dateToStr } from '@/utils/dateUtils'
 
 // ── Constants ──
@@ -136,6 +136,87 @@ function GanttPage() {
     window.addEventListener('kanban:milestone-change', handler)
     return () => window.removeEventListener('kanban:milestone-change', handler)
   }, [])
+
+  // ── Todo state ──
+  const [todos, setTodos] = useState<Todo[]>(() => projectStore.getTodos())
+  const [showTodoModal, setShowTodoModal] = useState(false)
+  const [editingTodo, setEditingTodo] = useState<Todo | null>(null)
+  const [todoName, setTodoName] = useState('')
+  const [todoPriority, setTodoPriority] = useState<ProjectPriority>('medium')
+  const [todoDesc, setTodoDesc] = useState('')
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as Todo[] | undefined
+      if (detail) setTodos([...detail])
+    }
+    window.addEventListener('kanban:todo-change', handler)
+    return () => window.removeEventListener('kanban:todo-change', handler)
+  }, [])
+
+  const openAddTodo = useCallback(() => {
+    setEditingTodo(null)
+    setTodoName('')
+    setTodoPriority('medium')
+    setTodoDesc('')
+    setShowTodoModal(true)
+  }, [])
+
+  const openEditTodo = useCallback((t: Todo) => {
+    setEditingTodo(t)
+    setTodoName(t.name)
+    setTodoPriority(t.priority)
+    setTodoDesc(t.description || '')
+    setShowTodoModal(true)
+  }, [])
+
+  const handleSaveTodo = useCallback(() => {
+    if (!todoName.trim()) return
+    if (editingTodo) {
+      projectStore.updateTodo(editingTodo.id, {
+        name: todoName.trim(),
+        priority: todoPriority,
+        description: todoDesc.trim() || undefined,
+      })
+    } else {
+      projectStore.addTodo({
+        name: todoName.trim(),
+        priority: todoPriority,
+        description: todoDesc.trim() || undefined,
+        completed: false,
+      })
+    }
+    setTodoName('')
+    setTodoPriority('medium')
+    setTodoDesc('')
+    setShowTodoModal(false)
+    setEditingTodo(null)
+  }, [todoName, todoPriority, todoDesc, editingTodo])
+
+  const handleToggleTodo = useCallback((id: string) => {
+    const t = todos.find(t => t.id === id)
+    if (t) {
+      projectStore.updateTodo(id, { completed: !t.completed })
+    }
+  }, [todos])
+
+  const handleDeleteTodo = useCallback((id: string) => {
+    if (confirm('確定要刪除這個待辦嗎？')) {
+      projectStore.removeTodo(id)
+    }
+  }, [])
+
+  const handleCopyTodo = useCallback(() => {
+    if (!editingTodo) return
+    projectStore.addTodo({
+      name: editingTodo.name + 'Q',
+      priority: editingTodo.priority,
+      description: editingTodo.description,
+      completed: false,
+    })
+    setShowTodoModal(false)
+    setEditingTodo(null)
+  }, [editingTodo])
 
   // ── Activity add/edit modal ──
   const [showActivityModal, setShowActivityModal] = useState(false)
@@ -567,6 +648,15 @@ function GanttPage() {
               活動
             </button>
             <button
+              onClick={openAddTodo}
+              className="flex items-center gap-1 px-3 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 text-sm font-medium border border-teal-600 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+              待辦
+            </button>
+            <button
               onClick={handleNavigateToSettings}
               className="flex items-center gap-1 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm font-medium border border-green-600 transition-colors"
             >
@@ -880,6 +970,83 @@ function GanttPage() {
         </div>
       </div>
 
+      {/* Todo list section */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <svg className="w-4 h-4 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+            待辦事項
+            {todos.length > 0 && (
+              <span className="bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full text-xs">
+                {todos.filter(t => !t.completed).length}/{todos.length}
+              </span>
+            )}
+          </h2>
+        </div>
+
+        {todos.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">還沒有待辦事項，點擊上方「待辦」按鈕新增</p>
+        ) : (
+          <div className="space-y-2">
+            {todos.map(todo => (
+              <div
+                key={todo.id}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors ${
+                  todo.completed
+                    ? 'bg-gray-50 border-gray-200'
+                    : 'bg-white border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                {/* Checkbox */}
+                <button
+                  onClick={() => handleToggleTodo(todo.id)}
+                  className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                    todo.completed
+                      ? 'bg-teal-500 border-teal-500'
+                      : 'border-gray-300 hover:border-teal-400'
+                  }`}
+                >
+                  {todo.completed && (
+                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </button>
+
+                {/* Priority indicator */}
+                <div
+                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: todo.priority === 'high' ? '#ef4444' : todo.priority === 'medium' ? '#eab308' : '#9ca3af' }}
+                />
+
+                {/* Name */}
+                <span
+                  className={`flex-1 text-sm cursor-pointer ${
+                    todo.completed
+                      ? 'line-through text-gray-400'
+                      : 'text-gray-700 hover:text-gray-900'
+                  }`}
+                  onClick={() => openEditTodo(todo)}
+                >
+                  {todo.name}
+                </span>
+
+                {/* Priority label */}
+                <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                  todo.priority === 'high' ? 'text-red-600 bg-red-50' :
+                  todo.priority === 'medium' ? 'text-yellow-600 bg-yellow-50' :
+                  'text-gray-500 bg-gray-50'
+                }`}>
+                  {todo.priority === 'high' ? '高' : todo.priority === 'medium' ? '中' : '低'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Add/edit activity modal */}
       {showActivityModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
@@ -966,6 +1133,82 @@ function GanttPage() {
                   className="flex-1 px-3 py-2 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   {editingActivity ? '儲存' : '新增'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}\n\n
+      {/* Add/edit todo modal */}
+      {showTodoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-80">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <span className="text-teal-500">✅</span> {editingTodo ? '編輯待辦' : '新增待辦'}
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">名稱</label>
+                <input
+                  type="text"
+                  value={todoName}
+                  onChange={e => setTodoName(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="輸入待辦名稱"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">優先級</label>
+                <select
+                  value={todoPriority}
+                  onChange={e => setTodoPriority(e.target.value as ProjectPriority)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="high">高</option>
+                  <option value="medium">中</option>
+                  <option value="low">低</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">說明 / 備註</label>
+                <textarea
+                  value={todoDesc}
+                  onChange={e => setTodoDesc(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none"
+                  rows={3}
+                  placeholder="輸入待辦說明或備註（選填）"
+                />
+              </div>
+              {editingTodo && (
+                <div className="flex gap-2 pt-1 text-xs">
+                  <button
+                    onClick={handleCopyTodo}
+                    className="text-blue-500 hover:text-blue-700 underline"
+                  >
+                    複製這個待辦
+                  </button>
+                  <button
+                    onClick={() => handleDeleteTodo(editingTodo.id)}
+                    className="text-red-500 hover:text-red-700 underline"
+                  >
+                    刪除這個待辦
+                  </button>
+                </div>
+              )}
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => { setShowTodoModal(false); setEditingTodo(null) }}
+                  className="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleSaveTodo}
+                  disabled={!todoName.trim()}
+                  className="flex-1 px-3 py-2 text-sm bg-teal-500 text-white rounded-lg hover:bg-teal-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {editingTodo ? '儲存' : '新增'}
                 </button>
               </div>
             </div>
