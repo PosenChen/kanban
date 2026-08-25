@@ -275,7 +275,7 @@ export const projectStore = {
   async loadFromGitHub(token: string): Promise<Project[]> {
     const projects = await readGitHub(token)
     if (projects.length > 0) {
-      // Migrate milestone-status projects to milestones
+      // Migrate milestone-status projects to activities
       const newProjects: Project[] = []
       for (const p of projects) {
         if ((p as any).status === 'milestone') {

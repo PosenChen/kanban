@@ -127,48 +127,48 @@ function GanttPage() {
     return () => window.removeEventListener('kanban:milestone-change', handler)
   }, [])
 
-  // ── Milestone add/edit modal ──
-  const [showMilestoneModal, setShowMilestoneModal] = useState(false)
-  const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null)
-  const [milestoneName, setMilestoneName] = useState('')
-  const [milestoneDate, setMilestoneDate] = useState(dateToStr(new Date()))
+  // ── Activity add/edit modal ──
+  const [showActivityModal, setShowActivityModal] = useState(false)
+  const [editingActivity, setEditingActivity] = useState<Milestone | null>(null)
+  const [activityName, setActivityName] = useState('')
+  const [activityDate, setActivityDate] = useState(dateToStr(new Date()))
 
-  const openAddModal = useCallback(() => {
-    setEditingMilestone(null)
-    setMilestoneName('')
-    setMilestoneDate(dateToStr(new Date()))
-    setShowMilestoneModal(true)
+  const openAddActivity = useCallback(() => {
+    setEditingActivity(null)
+    setActivityName('')
+    setActivityDate(dateToStr(new Date()))
+    setShowActivityModal(true)
   }, [])
 
-  const openEditModal = useCallback((m: Milestone) => {
-    setEditingMilestone(m)
-    setMilestoneName(m.name)
-    setMilestoneDate(m.date)
-    setShowMilestoneModal(true)
+  const openEditActivity = useCallback((m: Milestone) => {
+    setEditingActivity(m)
+    setActivityName(m.name)
+    setActivityDate(m.date)
+    setShowActivityModal(true)
   }, [])
 
-  const handleSaveMilestone = useCallback(() => {
-    if (!milestoneName.trim()) return
-    if (editingMilestone) {
-      projectStore.updateMilestone(editingMilestone.id, {
-        name: milestoneName.trim(),
-        date: milestoneDate,
+  const handleSaveActivity = useCallback(() => {
+    if (!activityName.trim()) return
+    if (editingActivity) {
+      projectStore.updateMilestone(editingActivity.id, {
+        name: activityName.trim(),
+        date: activityDate,
       })
     } else {
       projectStore.addMilestone({
-        name: milestoneName.trim(),
-        date: milestoneDate,
-        tags: ['里程碑'],
+        name: activityName.trim(),
+        date: activityDate,
+        tags: ['活動'],
       })
     }
-    setMilestoneName('')
-    setMilestoneDate(dateToStr(new Date()))
-    setShowMilestoneModal(false)
-    setEditingMilestone(null)
-  }, [milestoneName, milestoneDate, editingMilestone])
+    setActivityName('')
+    setActivityDate(dateToStr(new Date()))
+    setShowActivityModal(false)
+    setEditingActivity(null)
+  }, [activityName, activityDate, editingActivity])
 
-  const handleDeleteMilestone = useCallback((id: string) => {
-    if (confirm('確定要刪除這個里程碑嗎？')) {
+  const handleDeleteActivity = useCallback((id: string) => {
+    if (confirm('確定要刪除這個活動嗎？')) {
       projectStore.removeMilestone(id)
     }
   }, [])
@@ -536,13 +536,13 @@ function GanttPage() {
               新增
             </button>
             <button
-              onClick={openAddModal}
+              onClick={openAddActivity}
               className="flex items-center gap-1 px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 text-sm font-medium border border-purple-600 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              新增里程碑
+              活動
             </button>
             <button
               onClick={handleNavigateToSettings}
@@ -656,7 +656,7 @@ function GanttPage() {
                 className="fill-gray-500 font-semibold"
                 fontSize="10"
               >
-                🚩 里程碑
+                🚩 活動
               </text>
 
               {/* Milestone event blocks — horizontally centered on the date column */}
@@ -689,7 +689,7 @@ function GanttPage() {
                       y={headerHeight + 18}
                       className="fill-gray-700 cursor-pointer hover:underline"
                       fontSize="9"
-                      onClick={() => openEditModal(m)}
+                      onClick={() => openEditActivity(m)}
                     >
                       {m.name}
                     </text>
@@ -854,24 +854,24 @@ function GanttPage() {
 
         {/* Info bar */}
         <div className="px-4 py-2 bg-blue-50 border-t border-blue-200 text-xs text-blue-700">
-          💡 箭頭左右按鈕瀏覽時間軸 · 點擊日期進入日曆視圖 · 點擊專案進入詳細頁面 · 里程碑列在專案上方
+          💡 箭頭左右按鈕瀏覽時間軸 · 點擊日期進入日曆視圖 · 點擊專案進入詳細頁面 · 活動列在專案上方
         </div>
       </div>
 
-      {/* Add/edit milestone modal */}
-      {showMilestoneModal && (
+      {/* Add/edit activity modal */}
+      {showActivityModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-80">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <span className="text-purple-500">🚩</span> {editingMilestone ? '編輯里程碑' : '新增里程碑'}
+              <span className="text-purple-500">🚩</span> {editingActivity ? '編輯活動' : '新增活動'}
             </h3>
             <div className="space-y-3">
               <div>
                 <label className="block text-sm text-gray-600 mb-1">名稱</label>
                 <input
                   type="text"
-                  value={milestoneName}
-                  onChange={e => setMilestoneName(e.target.value)}
+                  value={activityName}
+                  onChange={e => setActivityName(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                   placeholder="例：第一次開標"
                   autoFocus
@@ -881,34 +881,34 @@ function GanttPage() {
                 <label className="block text-sm text-gray-600 mb-1">日期</label>
                 <input
                   type="date"
-                  value={milestoneDate}
-                  onChange={e => setMilestoneDate(e.target.value)}
+                  value={activityDate}
+                  onChange={e => setActivityDate(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                 />
               </div>
-              {editingMilestone && (
+              {editingActivity && (
                 <div className="pt-1">
                   <button
-                    onClick={() => handleDeleteMilestone(editingMilestone.id)}
+                    onClick={() => handleDeleteActivity(editingActivity.id)}
                     className="text-xs text-red-500 hover:text-red-700 underline"
                   >
-                    刪除這個里程碑
+                    刪除這個活動
                   </button>
                 </div>
               )}
               <div className="flex gap-2 pt-2">
                 <button
-                  onClick={() => { setShowMilestoneModal(false); setEditingMilestone(null) }}
+                  onClick={() => { setShowActivityModal(false); setEditingActivity(null) }}
                   className="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   取消
                 </button>
                 <button
-                  onClick={handleSaveMilestone}
-                  disabled={!milestoneName.trim()}
+                  onClick={handleSaveActivity}
+                  disabled={!activityName.trim()}
                   className="flex-1 px-3 py-2 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  {editingMilestone ? '儲存' : '新增'}
+                  {editingActivity ? '儲存' : '新增'}
                 </button>
               </div>
             </div>
