@@ -608,11 +608,61 @@ function GanttPage() {
             {/* Date headers */}
             {renderDateHeaders(headerHeight)}
 
-            {/* Root project rows */}
+            {/* Milestone events row — all milestones consolidated above projects */}
+            <g key={`milestones`}>
+              {/* Milestone row background */}
+              <rect
+                x={0}
+                y={headerHeight}
+                width={totalWidth}
+                height={MILESTONE_ROW_HEIGHT}
+                fill="#faf5ff"
+              />
+
+              {/* Row label */}
+              <text
+                x={8}
+                y={headerHeight + 20}
+                className="fill-gray-500 font-semibold"
+                fontSize="10"
+              >
+                🚩 里程碑
+              </text>
+
+              {/* Milestone event blocks */}
+              {milestoneEvents.map((m, idx) => {
+                const mIdx = dateHeaders.findIndex(h => h.dateStr === m.date)
+                if (mIdx < 0) return null
+                const mX = mIdx * DAY_WIDTH + SIDEBAR_WIDTH + 8
+                return (
+                  <g key={`me-${m.date}-${idx}`}>
+                    <rect
+                      x={mX}
+                      y={headerHeight + 6}
+                      width={20}
+                      height={16}
+                      rx={4}
+                      fill="#A855F7"
+                      opacity={0.9}
+                    />
+                    <text
+                      x={mX + 22}
+                      y={headerHeight + 18}
+                      className="fill-gray-700"
+                      fontSize="9"
+                    >
+                      {m.name}
+                    </text>
+                  </g>
+                )
+              })}
+            </g>
+
+            {/* Root project rows — offset below milestone row */}
             {filteredGroups.map((group, rowIdx) => {
               const rootProject = projects.find(p => p.id === group.projectId)
               if (!rootProject) return null
-              const yPos = headerHeight + rowIdx * ROW_MIN_HEIGHT
+              const yPos = headerHeight + MILESTONE_ROW_HEIGHT + rowIdx * ROW_MIN_HEIGHT
 
               // Sub-project count (excluding root)
               const subCount = group.subProjects.length
@@ -759,63 +809,12 @@ function GanttPage() {
                 </g>
               )
             })}
-
-            {/* Milestone events row — all milestones consolidated below projects */}
-            <g key={`milestones`}>
-              {/* Milestone row background */}
-              <rect
-                x={0}
-                y={totalRows * ROW_MIN_HEIGHT + headerHeight}
-                width={totalWidth}
-                height={MILESTONE_ROW_HEIGHT}
-                fill="#faf5ff"
-              />
-
-              {/* Row label */}
-              <text
-                x={8}
-                y={totalRows * ROW_MIN_HEIGHT + headerHeight + 20}
-                className="fill-gray-500 font-semibold"
-                fontSize="10"
-              >
-                🚩 里程碑
-              </text>
-
-              {/* Milestone event blocks */}
-              {milestoneEvents.map((m, idx) => {
-                const mIdx = dateHeaders.findIndex(h => h.dateStr === m.date)
-                if (mIdx < 0) return null
-                const mX = mIdx * DAY_WIDTH + SIDEBAR_WIDTH + 8
-                // Each milestone block is 20px wide (almost 1 day)
-                return (
-                  <g key={`me-${m.date}-${idx}`}>
-                    <rect
-                      x={mX}
-                      y={totalRows * ROW_MIN_HEIGHT + headerHeight + 6}
-                      width={20}
-                      height={16}
-                      rx={4}
-                      fill="#A855F7"
-                      opacity={0.9}
-                    />
-                    <text
-                      x={mX + 22}
-                      y={totalRows * ROW_MIN_HEIGHT + headerHeight + 18}
-                      className="fill-gray-700"
-                      fontSize="9"
-                    >
-                      {m.name}
-                    </text>
-                  </g>
-                )
-              })}
-            </g>
           </svg>
         </div>
 
         {/* Info bar */}
         <div className="px-4 py-2 bg-blue-50 border-t border-blue-200 text-xs text-blue-700">
-          💡 箭頭左右按鈕瀏覽時間軸 · 點擊日期進入日曆視圖 · 點擊專案進入詳細頁面 · 下方紫色區塊 = 里程碑
+          💡 箭頭左右按鈕瀏覽時間軸 · 點擊日期進入日曆視圖 · 點擊專案進入詳細頁面 · 里程碑列在專案上方
         </div>
       </div>
     </div>
