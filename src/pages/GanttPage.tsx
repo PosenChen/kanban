@@ -413,16 +413,44 @@ function GanttPage() {
         />
       ))}
 
-      {/* Today vertical line */}
+      {/* Today vertical line — solid red line */}
       <line
         x1={todayOffset}
         y1={headerHeight}
         x2={todayOffset}
         y2={rowGroups.length * ROW_MIN_HEIGHT + headerHeight}
         stroke="#ef4444"
-        strokeWidth={1.5}
-        strokeDasharray="4 2"
+        strokeWidth={2.5}
       />
+
+      {/* Today vertical highlight band — light red column */}
+      <rect
+        x={todayOffset}
+        y={0}
+        width={DAY_WIDTH}
+        height={rowGroups.length * ROW_MIN_HEIGHT + headerHeight}
+        fill="#fef2f2"
+        opacity={0.6}
+      />
+
+      {/* Today label in date header */}
+      <rect
+        x={todayOffset + DAY_WIDTH / 2 - 20}
+        y={headerHeight - 2}
+        width={40}
+        height={16}
+        rx={4}
+        fill="#ef4444"
+      />
+      <text
+        x={todayOffset + DAY_WIDTH / 2}
+        y={headerHeight + 10}
+        textAnchor="middle"
+        className="fill-white font-bold"
+        fontSize="8"
+      >
+        Today
+      </text>
     </g>
   )
 
