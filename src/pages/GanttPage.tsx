@@ -849,7 +849,7 @@ function GanttPage() {
                       <g onClick={() => handleProjectClick(project.id)} className="cursor-pointer">
                         <rect x={0} y={yPos} width={SIDEBAR_WIDTH} height={rowHeight} fill="transparent" />
                         <rect x={0} y={yPos} width={2} height={rowHeight} fill="#3B82F6" />
-                        <text x={36} y={yPos + rowHeight / 2 + 4} className="fill-gray-800 font-medium" fontSize="12">
+                        <text x={46} y={yPos + rowHeight / 2 + 4} className="fill-gray-800 font-medium" fontSize="12">
                           {project.name}
                         </text>
                         {/* Expand/collapse button */}
