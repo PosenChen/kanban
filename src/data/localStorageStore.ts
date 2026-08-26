@@ -418,9 +418,11 @@ export const projectStore = {
   },
 
   moveTodoUp(todoId: string): Todo | undefined {
+    console.log('[store] moveTodoUp called:', todoId)
     const sorted = [...todos].sort((a, b) => a.sort_order - b.sort_order)
     if (sorted.length <= 1) return undefined
     const idx = sorted.findIndex(t => t.id === todoId)
+    console.log('[store] moveTodoUp sorted idx:', idx, 'length:', sorted.length)
     if (idx <= 0) return undefined
     const [current, prev] = [sorted[idx], sorted[idx - 1]]
     const tIdx = todos.findIndex(t => t.id === prev.id)
@@ -430,13 +432,16 @@ export const projectStore = {
     todos[cIdx] = { ...current, sort_order: prev.sort_order, updated_at: new Date().toISOString() }
     saveTodos(todos)
     emitTodoChange()
+    console.log('[store] after swap:', todos.map(t => ({id: t.id, sort_order: t.sort_order})))
     return todos[cIdx]
   },
 
   moveTodoDown(todoId: string): Todo | undefined {
+    console.log('[store] moveTodoDown called:', todoId)
     const sorted = [...todos].sort((a, b) => a.sort_order - b.sort_order)
     if (sorted.length <= 1) return undefined
     const idx = sorted.findIndex(t => t.id === todoId)
+    console.log('[store] moveTodoDown sorted idx:', idx, 'length:', sorted.length)
     if (idx >= sorted.length - 1) return undefined
     const [current, next] = [sorted[idx], sorted[idx + 1]]
     const nIdx = todos.findIndex(t => t.id === next.id)
@@ -446,6 +451,7 @@ export const projectStore = {
     todos[cIdx] = { ...current, sort_order: next.sort_order, updated_at: new Date().toISOString() }
     saveTodos(todos)
     emitTodoChange()
+    console.log('[store] after swap:', todos.map(t => ({id: t.id, sort_order: t.sort_order})))
     return todos[cIdx]
   },
 

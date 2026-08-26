@@ -104,13 +104,17 @@ function GanttPage() {
 
   // ── Todo reorder handlers ──
   const handleMoveTodoUp = useCallback((todoId: string) => {
+    console.log('[GanttPage] moveTodoUp:', todoId)
     projectStore.moveTodoUp(todoId)
     setTodos([...projectStore.getTodos()])
+    console.log('[GanttPage] after moveTodoUp, todos:', projectStore.getTodos().map(t => ({id: t.id, sort_order: t.sort_order})))
   }, [])
 
   const handleMoveTodoDown = useCallback((todoId: string) => {
+    console.log('[GanttPage] moveTodoDown:', todoId)
     projectStore.moveTodoDown(todoId)
     setTodos([...projectStore.getTodos()])
+    console.log('[GanttPage] after moveTodoDown, todos:', projectStore.getTodos().map(t => ({id: t.id, sort_order: t.sort_order})))
   }, [])
 
   // ── Filtering ──
