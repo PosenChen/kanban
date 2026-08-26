@@ -710,7 +710,7 @@ function GanttPage() {
                       {/* Move up/down for all rows — placed inside name area */}
                       <div className="flex flex-col gap-0 pointer-events-auto flex-shrink-0">
                         <span
-                          className="cursor-pointer hover:bg-blue-200 rounded w-[12px] h-[8px] flex items-center justify-center text-[6px] text-gray-300 hover:text-blue-500"
+                          className="cursor-pointer hover:bg-blue-200 rounded w-[14px] h-[10px] flex items-center justify-center text-[8px] text-gray-300 hover:text-blue-500"
                           onClick={(e) => {
                             e.stopPropagation()
                             handleMoveProjectUp(isRoot ? null : project.parent_id)
@@ -720,7 +720,7 @@ function GanttPage() {
                           ▲
                         </span>
                         <span
-                          className="cursor-pointer hover:bg-blue-200 rounded w-[12px] h-[8px] flex items-center justify-center text-[6px] text-gray-300 hover:text-blue-500"
+                          className="cursor-pointer hover:bg-blue-200 rounded w-[14px] h-[10px] flex items-center justify-center text-[8px] text-gray-300 hover:text-blue-500"
                           onClick={(e) => {
                             e.stopPropagation()
                             handleMoveProjectDown(isRoot ? null : project.parent_id)
