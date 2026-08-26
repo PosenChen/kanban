@@ -269,6 +269,51 @@ export const projectStore = {
     return cached.filter(p => p.parent_id === projectId)
   },
 
+  /** Deep copy a project and all its children recursively, appending 'Q' to names */
+  copyProject(parentId: string): { project: Project; childCount: number } | null {
+    const source = cached.find(p => p.id === parentId)
+    if (!source) return null
+    const now = new Date().toISOString()
+
+    // Create new project with Q suffix
+    const newProject: Project = {
+      ...source,
+      id: `p${Date.now().toString(36)}`,
+      name: source.name + 'Q',
+      created_at: now,
+      updated_at: now,
+      actual_start_date: undefined,
+      actual_end_date: undefined,
+    }
+    cached = [...cached, newProject]
+
+    // Recursively copy children, counting them
+    let childCount = 0
+    const copyChildren = (childParentId: string, newParentId: string) => {
+      const children = cached.filter(p => p.parent_id === childParentId)
+      for (const child of children) {
+        childCount++
+        const newChild: Project = {
+          ...child,
+          id: `p${Date.now().toString(36)}`,
+          name: child.name + 'Q',
+          parent_id: newParentId,
+          created_at: now,
+          updated_at: now,
+          actual_start_date: undefined,
+          actual_end_date: undefined,
+        }
+        cached = [...cached, newChild]
+        copyChildren(child.id, newChild.id)
+      }
+    }
+    copyChildren(parentId, newProject.id)
+
+    saveLocal(cached)
+    emitProjectChange()
+    return { project: newProject, childCount }
+  },
+
   getRootProjects(): Project[] {
     return cached.filter(p => p.parent_id === null)
   },

@@ -1,16 +1,17 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
+import { projectStore } from '@/data/localStorageStore'
 import { STATUS_CONFIG, PRIORITY_CONFIG, type Project } from '@/types/project'
 import { getRemainingDays, getDaysDiff, formatMonthDay } from '@/utils/dateUtils'
 import ProjectForm from '@/components/ProjectForm'
 import ProjectCard from '@/components/ProjectCard'
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 
 function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
   if (!id) return <div className="flex items-center justify-center h-64 text-gray-400"><p>找不到專案 ID</p></div>
   const navigate = useNavigate()
-  const { getById, update, remove, getByParent, getAll, add } = useProjects()
+  const { getById, update, remove, getByParent, getAll } = useProjects()
 
   const project = getById(id)
   const [showForm, setShowForm] = useState(false)
@@ -121,18 +122,13 @@ function ProjectDetailPage() {
             </button>
             <button
               onClick={() => {
-                const copyName = project.name + 'Q'
-                add({
-                  name: copyName,
-                  description: project.description,
-                  parent_id: project.parent_id,
-                  start_date: project.start_date,
-                  end_date: project.end_date,
-                  status: project.status,
-                  priority: project.priority,
-                  tags: [...project.tags],
-                  progress: project.progress,
-                })
+                const result = projectStore.copyProject(id)
+                if (result) {
+                  const childText = result.childCount > 0
+                    ? `（含 ${result.childCount} 個子專案）`
+                    : ''
+                  alert(`已複製專案「${result.project.name}」${childText}`)
+                }
               }}
               className="px-3 py-1.5 text-sm bg-gray-100 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-200"
             >
