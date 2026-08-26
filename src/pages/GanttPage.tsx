@@ -447,18 +447,32 @@ function GanttPage() {
     const x = offsetDays * DAY_WIDTH
     const barY = yPos + 2
     const barH = rowHeight - 4
+    const showLabel = barWidth > 36
 
     return (
-      <rect
-        x={x}
-        y={barY}
-        width={barWidth}
-        height={barH}
-        rx={3} ry={3}
-        fill={statusColorMap[project.status] || '#3B82F6'}
-        onClick={() => handleProjectClick(project.id)}
-        style={{ pointerEvents: 'auto', cursor: 'pointer' }}
-      />
+      <g>
+        <rect
+          x={x}
+          y={barY}
+          width={barWidth}
+          height={barH}
+          rx={3} ry={3}
+          fill={statusColorMap[project.status] || '#3B82F6'}
+          onClick={() => handleProjectClick(project.id)}
+          style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+        />
+        {showLabel && (
+          <text
+            x={x + 6}
+            y={barY + barH / 2 + 3}
+            className="fill-white"
+            fontSize="8"
+            pointerEvents="none"
+          >
+            {project.name.length > 6 ? project.name.slice(0, 6) + '…' : project.name}
+          </text>
+        )}
+      </g>
     )
   }
 
