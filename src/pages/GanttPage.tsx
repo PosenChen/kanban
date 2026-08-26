@@ -47,13 +47,16 @@ function GanttPage() {
   const rowGroups = useMemo(() => buildRowGroups(projects), [projects])
 
   // ── View state ──
-  const [viewStart, setViewStart] = useState(() => {
-    if (!projects.length) return dateToStr(new Date())
+  const [viewStart, setViewStart] = useState(dateToStr(new Date()))
+
+  // Update viewStart when projects/milestones load
+  useEffect(() => {
     const allDates = projects.map(p => p.start_date)
     const milestoneDates = milestones.map(m => m.date)
     const all = [...allDates, ...milestoneDates]
-    return all.reduce((min, d) => (d < min ? d : min), all[0])
-  })
+    const firstDate = all.reduce((min, d) => (d < min ? d : min), all[0])
+    setViewStart(prev => (firstDate < prev ? firstDate : prev))
+  }, [projects, milestones])
 
   // ── Filter ──
   const [searchQuery, setSearchQuery] = useState('')
