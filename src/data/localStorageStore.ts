@@ -282,7 +282,7 @@ export const projectStore = {
     // Create new project with Q suffix
     const newProject: Project = {
       ...source,
-      id: `p${Date.now().toString(36)}`,
+      id: `p${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`,
       name: source.name + 'Q',
       created_at: now,
       updated_at: now,
@@ -299,7 +299,7 @@ export const projectStore = {
         childCount++
         const newChild: Project = {
           ...child,
-          id: `p${Date.now().toString(36)}`,
+          id: `p${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`,
           name: child.name + 'Q',
           parent_id: newParentId,
           created_at: now,

@@ -199,8 +199,13 @@ function ProjectDetailPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-lg font-semibold mb-3">子專案（{children.length}）</h2>
           <div className="space-y-3">
-            {children.map((child: Project) => (
-              <div key={child.id} onClick={() => navigate(`/project/${child.id}`)} className="cursor-pointer">
+            {children.map((child: Project) => {
+              console.log('[ProjectDetailPage] Child click handler created, child.id:', child.id, 'name:', child.name, 'parent_id:', child.parent_id)
+              return (
+              <div key={child.id} onClick={() => {
+                console.log('[ProjectDetailPage] Child clicked, navigating to /project/' + child.id)
+                navigate(`/project/${child.id}`)
+              }} className="cursor-pointer">
                 <ProjectCard
                   project={child}
                   onClick={() => navigate(`/project/${child.id}`)}
@@ -211,7 +216,8 @@ function ProjectDetailPage() {
                   }}
                 />
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}

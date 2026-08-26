@@ -376,8 +376,10 @@ function GanttPage() {
   }, [navigate])
 
   const handleProjectClick = useCallback((id: string) => {
+    const project = projects.find(p => p.id === id)
+    console.log('[handleProjectClick] ID:', id, 'projectName:', project?.name, 'currentUrl:', window.location.href)
     navigate(`/project/${id}`)
-  }, [navigate])
+  }, [navigate, projects])
 
   const handleAdd = useCallback(() => {
     const now = new Date().toISOString().split('T')[0]
