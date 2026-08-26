@@ -184,6 +184,7 @@ function DailyPage() {
             name: `今天新增的專案`,
             description: '',
             parent_id: null,
+            sort_order: 0,
             start_date: targetDate,
             end_date: targetDate,
             status: 'preparation',

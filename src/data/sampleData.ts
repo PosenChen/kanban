@@ -1,6 +1,6 @@
 import type { Project } from '@/types/project'
 
-export const SAMPLE_PROJECTS: Omit<Project, 'id' | 'created_at' | 'updated_at'>[] = [
+export const SAMPLE_PROJECTS: Omit<Project, 'id' | 'created_at' | 'updated_at' | 'sort_order'>[] = [
   {
     name: '115學年度制服採購案',
     description: '全校學生制服採購與發包專案',
@@ -78,15 +78,39 @@ export const SAMPLE_PROJECTS: Omit<Project, 'id' | 'created_at' | 'updated_at'>[
     tags: ['開發', '投資', '程式'],
     progress: 15,
   },
+  {
+    name: '經濟學知識短影片',
+    description: '經濟學專有名詞和知識點短影片製作',
+    parent_id: null,
+    start_date: '2027-01-01',
+    end_date: '2027-12-31',
+    status: 'preparation',
+    priority: 'low',
+    tags: ['教學', '影片', '經濟'],
+    progress: 5,
+  },
 ]
 
-// Assign IDs and timestamps
+// Assign IDs, timestamps, and sort_order
 const IDS = ['p001', 'p002', 'p003', 'p004', 'p005', 'p006', 'p007', 'p008', 'p009', 'p010', 'p011', 'p012']
 const NOW = new Date().toISOString()
 
 export const SAMPLE_PROJECTS_WITH_META: Project[] = SAMPLE_PROJECTS.map((p, i) => ({
   ...p,
   id: IDS[i],
+  sort_order: 0,  // default, will be remapped below
   created_at: i === 0 ? '2026-08-15T10:00:00Z' : NOW,
   updated_at: i === 0 ? '2026-08-22T14:30:00Z' : NOW,
 }))
+
+// Remap sort_order: group by parent_id, assign sequential order
+const parentIdGroups = new Map<string | null, typeof SAMPLE_PROJECTS_WITH_META>()
+SAMPLE_PROJECTS_WITH_META.forEach(p => {
+  const key = p.parent_id ?? '__ROOT__'
+  const arr = parentIdGroups.get(key) || []
+  arr.push(p)
+  parentIdGroups.set(key, arr)
+})
+parentIdGroups.forEach((arr) => {
+  arr.forEach((p, i) => { p.sort_order = i })
+})

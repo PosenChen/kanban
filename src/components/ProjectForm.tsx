@@ -42,6 +42,7 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects }: ProjectFo
       name: name.trim(),
       description: description.trim(),
       parent_id: parentId || null,
+      sort_order: 0,
       start_date: startDate,
       end_date: endDate,
       status,

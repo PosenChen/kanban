@@ -43,7 +43,7 @@ interface DayHeader {
 
 function GanttPage() {
   const navigate = useNavigate()
-  const { projects, add, remove } = useProjects()
+  const { projects, add, remove, moveProjectUp, moveProjectDown } = useProjects()
   const [milestones, setMilestones] = useState<Milestone[]>(() => projectStore.getMilestones())
   const rowGroups = useMemo(() => buildRowGroups(projects), [projects])
 
@@ -93,6 +93,24 @@ function GanttPage() {
     })
   }, [])
 
+  // ── Project reorder handlers ──
+  const handleMoveProjectUp = useCallback((parentId: string | null) => {
+    moveProjectUp(parentId)
+  }, [moveProjectUp])
+
+  const handleMoveProjectDown = useCallback((parentId: string | null) => {
+    moveProjectDown(parentId)
+  }, [moveProjectDown])
+
+  // ── Todo reorder handlers ──
+  const handleMoveTodoUp = useCallback((todoId: string) => {
+    projectStore.moveTodoUp(todoId)
+  }, [])
+
+  const handleMoveTodoDown = useCallback((todoId: string) => {
+    projectStore.moveTodoDown(todoId)
+  }, [])
+
   // ── Filtering ──
   const filteredList = useMemo(() => {
     let list = projects
@@ -113,9 +131,13 @@ function GanttPage() {
   const filteredGroups = useMemo(() => {
     const filteredIds = new Set(filteredList.map(p => p.id))
     const filteredRoots = filteredList.filter(p => p.parent_id === null && filteredIds.has(p.id))
+    // Sort root projects by sort_order ascending
+    filteredRoots.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     const groups: { projectId: string; subProjects: Project[] }[] = []
     for (const root of filteredRoots) {
       const subs = filteredList.filter(p => p.parent_id === root.id)
+      // Sort sub-projects by sort_order ascending
+      subs.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       groups.push({ projectId: root.id, subProjects: subs })
     }
     return groups
@@ -166,6 +188,11 @@ function GanttPage() {
     window.addEventListener('kanban:todo-change', handler)
     return () => window.removeEventListener('kanban:todo-change', handler)
   }, [])
+
+  // Sorted todos by sort_order ascending
+  const sortedTodos = useMemo(() => {
+    return [...todos].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+  }, [todos])
 
   const openAddTodo = useCallback(() => {
     setEditingTodo(null)
@@ -387,6 +414,7 @@ function GanttPage() {
       name: '新專案',
       description: '',
       parent_id: null,
+      sort_order: 0,
       start_date: now,
       end_date: dateToStr(new Date(new Date(now).getTime() + 7 * 86400000)),
       status: 'preparation',
@@ -688,11 +716,32 @@ function GanttPage() {
                       </span>
                     </div>
 
-                    {/* Expand / collapse button — 14×14, no badge */}
-                    <div className="w-[28px] flex-shrink-0 flex items-center justify-center pointer-events-auto">
+                    {/* Reorder / expand buttons */}
+                    <div className="w-[44px] flex-shrink-0 flex flex-col items-center justify-center gap-0.5 pointer-events-auto">
+                      {/* Move up arrow */}
+                      <span
+                        className="cursor-pointer hover:bg-blue-200 rounded w-[14px] h-[10px] flex items-center justify-center text-[7px] text-gray-400 hover:text-blue-600"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleMoveProjectUp(isRoot ? null : project.parent_id)
+                        }}
+                      >
+                        ▲
+                      </span>
+                      {/* Move down arrow */}
+                      <span
+                        className="cursor-pointer hover:bg-blue-200 rounded w-[14px] h-[10px] flex items-center justify-center text-[7px] text-gray-400 hover:text-blue-600"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleMoveProjectDown(isRoot ? null : project.parent_id)
+                        }}
+                      >
+                        ▼
+                      </span>
+                      {/* Expand / collapse for roots */}
                       {isRoot && sc > 0 && (
                         <span
-                          className="cursor-pointer hover:brightness-110 flex items-center justify-center w-[14px] h-[14px] rounded text-[10px] font-bold transition-colors bg-gray-200 text-gray-500 hover:bg-gray-300"
+                          className="cursor-pointer hover:bg-blue-200 rounded w-[14px] h-[10px] flex items-center justify-center text-[9px] font-bold transition-colors bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-blue-600"
                           onClick={(e) => { e.stopPropagation(); toggleExpand(project.id) }}
                         >
                           {exp ? '▼' : '▶'}
@@ -860,19 +909,19 @@ function GanttPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
             </svg>
             待辦事項
-            {todos.length > 0 && (
+            {sortedTodos.length > 0 && (
               <span className="bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full text-xs">
-                {todos.filter(t => !t.completed).length}/{todos.length}
+                {sortedTodos.filter(t => !t.completed).length}/{sortedTodos.length}
               </span>
             )}
           </h2>
         </div>
 
-        {todos.length === 0 ? (
+        {sortedTodos.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-4">還沒有待辦事項，點擊上方「待辦」按鈕新增</p>
         ) : (
           <div className="space-y-2">
-            {todos.map(todo => (
+            {sortedTodos.map(todo => (
               <div
                 key={todo.id}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors ${
@@ -919,6 +968,22 @@ function GanttPage() {
                 }`}>
                   {todo.priority === 'high' ? '高' : todo.priority === 'medium' ? '中' : '低'}
                 </span>
+
+                {/* Reorder arrows */}
+                <div className="flex flex-col gap-0 pointer-events-auto">
+                  <span
+                    className="cursor-pointer hover:bg-blue-200 rounded w-[12px] h-[8px] flex items-center justify-center text-[6px] text-gray-400 hover:text-blue-600"
+                    onClick={(e) => { e.stopPropagation(); handleMoveTodoUp(todo.id) }}
+                  >
+                    ▲
+                  </span>
+                  <span
+                    className="cursor-pointer hover:bg-blue-200 rounded w-[12px] h-[8px] flex items-center justify-center text-[6px] text-gray-400 hover:text-blue-600"
+                    onClick={(e) => { e.stopPropagation(); handleMoveTodoDown(todo.id) }}
+                  >
+                    ▼
+                  </span>
+                </div>
               </div>
             ))}
           </div>

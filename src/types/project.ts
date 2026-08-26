@@ -17,6 +17,7 @@ export interface Project {
   name: string
   description: string
   parent_id: string | null
+  sort_order: number  // 0 = top, higher = lower; used for reordering within same level
   start_date: string // YYYY-MM-DD
   end_date: string   // YYYY-MM-DD
   status: ProjectStatus
@@ -59,6 +60,7 @@ export interface Todo {
   id: string
   name: string
   priority: ProjectPriority
+  sort_order: number  // 0 = top, higher = lower
   description?: string
   completed: boolean
   created_at: string

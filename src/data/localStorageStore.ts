@@ -170,6 +170,42 @@ cached.forEach(p => {
 // Clean up any remaining milestone-status projects (second pass)
 cached = cached.filter(p => (p as any).status !== 'milestone')
 
+// ── Migration: add sort_order to projects missing it ──
+// Group by parent_id and assign sequential sort_order
+const groupsByParent = new Map<string | null, Project[]>()
+cached.forEach(p => {
+  const key = p.parent_id ?? '__ROOT__'
+  const arr = groupsByParent.get(key) || []
+  arr.push(p)
+  groupsByParent.set(key, arr)
+})
+groupsByParent.forEach((arr, key) => {
+  arr.sort((a, b) => ((a as any).sort_order ?? 0) - ((b as any).sort_order ?? 0))
+  arr.forEach((p, i) => {
+    const idx = cached.findIndex(c => c.id === p.id)
+    if (idx !== -1) {
+      const existing = cached[idx]
+      if (!existing.sort_order && existing.sort_order !== 0) {
+        cached[idx] = { ...existing, sort_order: i, updated_at: new Date().toISOString() }
+      }
+    }
+  })
+})
+
+// ── Migration: add sort_order to todos missing it ──
+todos.forEach((t, i) => {
+  const idx = todos.findIndex(x => x.id === t.id)
+  if (idx !== -1) {
+    const existing = todos[idx]
+    if (!existing.sort_order && existing.sort_order !== 0) {
+      todos[idx] = { ...existing, sort_order: i, updated_at: new Date().toISOString() }
+    }
+  }
+})
+
+saveLocal(cached)
+saveTodos(todos)
+
 function emitProjectChange() {
   window.dispatchEvent(new CustomEvent('kanban:data-change', { detail: cached }))
 }
@@ -227,8 +263,10 @@ export const projectStore = {
 
   add(project: Omit<Project, 'id' | 'created_at' | 'updated_at'>): Project {
     const now = new Date().toISOString()
+    const sortOrder = cached.filter(p => p.parent_id === project.parent_id).length
     const newProject: Project = {
       ...project,
+      sort_order: sortOrder,
       id: `p${Date.now().toString(36)}`,
       created_at: now,
       updated_at: now,
@@ -279,9 +317,14 @@ export const projectStore = {
     if (!source) return null
     const now = new Date().toISOString()
 
+    // Determine new sort_order: append after all root projects (or children of same parent)
+    const sameParent = cached.filter(p => p.parent_id === source.parent_id)
+    const newSortOrder = sameParent.length
+
     // Create new project with Q suffix
     const newProject: Project = {
       ...source,
+      sort_order: newSortOrder,
       id: `p${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`,
       name: source.name + 'Q',
       created_at: now,
@@ -291,14 +334,16 @@ export const projectStore = {
     }
     cached = [...cached, newProject]
 
-    // Recursively copy children, counting them
+    // Recursively copy children with sequential sort_order
     let childCount = 0
+    let childOrder = 0
     const copyChildren = (childParentId: string, newParentId: string) => {
       const children = cached.filter(p => p.parent_id === childParentId)
       for (const child of children) {
         childCount++
         const newChild: Project = {
           ...child,
+          sort_order: childOrder++,
           id: `p${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`,
           name: child.name + 'Q',
           parent_id: newParentId,
@@ -317,6 +362,68 @@ export const projectStore = {
     emitProjectChange()
     emitProjectCopied(newProject.id)
     return { project: newProject, childCount }
+  },
+
+  // ── Project reordering (sort_order) ──
+  moveProjectUp(parentId: string | null): Project | undefined {
+    const siblings = cached.filter(p => p.parent_id === parentId).sort((a, b) => a.sort_order - b.sort_order)
+    if (siblings.length <= 1) return undefined
+    const [first, second] = siblings
+    // Swap sort_orders in cached
+    const firstIdx = cached.findIndex(p => p.id === first.id)
+    const secondIdx = cached.findIndex(p => p.id === second.id)
+    if (firstIdx === -1 || secondIdx === -1) return undefined
+    cached[firstIdx] = { ...first, sort_order: second.sort_order, updated_at: new Date().toISOString() }
+    cached[secondIdx] = { ...second, sort_order: first.sort_order, updated_at: new Date().toISOString() }
+    saveLocal(cached)
+    emitProjectChange()
+    return cached[firstIdx]
+  },
+
+  moveProjectDown(parentId: string | null): Project | undefined {
+    const siblings = cached.filter(p => p.parent_id === parentId).sort((a, b) => a.sort_order - b.sort_order)
+    if (siblings.length <= 1) return undefined
+    const [prev, last] = [siblings[siblings.length - 2], siblings[siblings.length - 1]]
+    const prevIdx = cached.findIndex(p => p.id === prev.id)
+    const lastIdx = cached.findIndex(p => p.id === last.id)
+    if (prevIdx === -1 || lastIdx === -1) return undefined
+    cached[prevIdx] = { ...prev, sort_order: last.sort_order, updated_at: new Date().toISOString() }
+    cached[lastIdx] = { ...last, sort_order: prev.sort_order, updated_at: new Date().toISOString() }
+    saveLocal(cached)
+    emitProjectChange()
+    return cached[lastIdx]
+  },
+
+  moveTodoUp(todoId: string): Todo | undefined {
+    const sorted = [...todos].sort((a, b) => a.sort_order - b.sort_order)
+    if (sorted.length <= 1) return undefined
+    const idx = sorted.findIndex(t => t.id === todoId)
+    if (idx <= 0) return undefined
+    const [current, prev] = [sorted[idx], sorted[idx - 1]]
+    const tIdx = todos.findIndex(t => t.id === prev.id)
+    const cIdx = todos.findIndex(t => t.id === current.id)
+    if (tIdx === -1 || cIdx === -1) return undefined
+    todos[tIdx] = { ...prev, sort_order: current.sort_order, updated_at: new Date().toISOString() }
+    todos[cIdx] = { ...current, sort_order: prev.sort_order, updated_at: new Date().toISOString() }
+    saveTodos(todos)
+    emitTodoChange()
+    return todos[cIdx]
+  },
+
+  moveTodoDown(todoId: string): Todo | undefined {
+    const sorted = [...todos].sort((a, b) => a.sort_order - b.sort_order)
+    if (sorted.length <= 1) return undefined
+    const idx = sorted.findIndex(t => t.id === todoId)
+    if (idx >= sorted.length - 1) return undefined
+    const [current, next] = [sorted[idx], sorted[idx + 1]]
+    const nIdx = todos.findIndex(t => t.id === next.id)
+    const cIdx = todos.findIndex(t => t.id === current.id)
+    if (nIdx === -1 || cIdx === -1) return undefined
+    todos[nIdx] = { ...next, sort_order: current.sort_order, updated_at: new Date().toISOString() }
+    todos[cIdx] = { ...current, sort_order: next.sort_order, updated_at: new Date().toISOString() }
+    saveTodos(todos)
+    emitTodoChange()
+    return todos[cIdx]
   },
 
   getRootProjects(): Project[] {
@@ -368,10 +475,12 @@ export const projectStore = {
 
   // ── Todo CRUD ──
 
-  addTodo(data: Omit<Todo, 'id' | 'created_at' | 'updated_at'>): Todo {
+  addTodo(data: Omit<Todo, 'id' | 'created_at' | 'updated_at' | 'sort_order'>): Todo {
     const now = new Date().toISOString()
+    const sortOrder = todos.length
     const newTodo: Todo = {
       ...data,
+      sort_order: sortOrder,
       id: `t${Date.now().toString(36)}`,
       created_at: now,
       updated_at: now,
