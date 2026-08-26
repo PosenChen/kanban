@@ -94,12 +94,12 @@ function GanttPage() {
   }, [])
 
   // ── Project reorder handlers ──
-  const handleMoveProjectUp = useCallback((parentId: string | null) => {
-    moveProjectUp(parentId)
+  const handleMoveProjectUp = useCallback((parentId: string | null, projectId: string) => {
+    moveProjectUp(parentId, projectId)
   }, [moveProjectUp])
 
-  const handleMoveProjectDown = useCallback((parentId: string | null) => {
-    moveProjectDown(parentId)
+  const handleMoveProjectDown = useCallback((parentId: string | null, projectId: string) => {
+    moveProjectDown(parentId, projectId)
   }, [moveProjectDown])
 
   // ── Todo reorder handlers ──
@@ -713,7 +713,7 @@ function GanttPage() {
                           className="cursor-pointer hover:bg-blue-200 rounded w-[14px] h-[10px] flex items-center justify-center text-[8px] text-gray-300 hover:text-blue-500"
                           onClick={(e) => {
                             e.stopPropagation()
-                            handleMoveProjectUp(isRoot ? null : project.parent_id)
+                            handleMoveProjectUp(isRoot ? null : project.parent_id, project.id)
                           }}
                           title="上移"
                         >
@@ -723,7 +723,7 @@ function GanttPage() {
                           className="cursor-pointer hover:bg-blue-200 rounded w-[14px] h-[10px] flex items-center justify-center text-[8px] text-gray-300 hover:text-blue-500"
                           onClick={(e) => {
                             e.stopPropagation()
-                            handleMoveProjectDown(isRoot ? null : project.parent_id)
+                            handleMoveProjectDown(isRoot ? null : project.parent_id, project.id)
                           }}
                           title="下移"
                         >

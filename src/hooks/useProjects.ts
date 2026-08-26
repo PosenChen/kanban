@@ -49,7 +49,7 @@ export function useProjects() {
     getChildren: useCallback((projectId: string) => projectStore.getChildren(projectId), []),
     getById: useCallback((id: string) => projectStore.getById(id), []),
     getAll: useCallback(() => projectStore.getAll(), []),
-    moveProjectUp: useCallback((parentId: string | null) => projectStore.moveProjectUp(parentId), []),
-    moveProjectDown: useCallback((parentId: string | null) => projectStore.moveProjectDown(parentId), []),
+    moveProjectUp: useCallback((parentId: string | null, projectId: string) => projectStore.moveProjectUp(parentId, projectId), []),
+    moveProjectDown: useCallback((parentId: string | null, projectId: string) => projectStore.moveProjectDown(parentId, projectId), []),
   }
 }

@@ -381,33 +381,40 @@ export const projectStore = {
   },
 
   // ── Project reordering (sort_order) ──
-  moveProjectUp(parentId: string | null): Project | undefined {
-    const siblings = cached.filter(p => p.parent_id === parentId).sort((a, b) => a.sort_order - b.sort_order)
+  // Move the given project up: swap with the immediately preceding sibling (lower sort_order)
+  moveProjectUp(parentId: string | null, projectId: string): Project | undefined {
+    const siblings = cached.filter(p => p.parent_id === parentId).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     if (siblings.length <= 1) return undefined
-    const [first, second] = siblings
+    const idx = siblings.findIndex(p => p.id === projectId)
+    if (idx <= 0) return undefined
+    const [current, prev] = [siblings[idx], siblings[idx - 1]]
     // Swap sort_orders in cached
-    const firstIdx = cached.findIndex(p => p.id === first.id)
-    const secondIdx = cached.findIndex(p => p.id === second.id)
-    if (firstIdx === -1 || secondIdx === -1) return undefined
-    cached[firstIdx] = { ...first, sort_order: second.sort_order, updated_at: new Date().toISOString() }
-    cached[secondIdx] = { ...second, sort_order: first.sort_order, updated_at: new Date().toISOString() }
+    const cIdx = cached.findIndex(p => p.id === current.id)
+    const pIdx = cached.findIndex(p => p.id === prev.id)
+    if (cIdx === -1 || pIdx === -1) return undefined
+    cached[cIdx] = { ...current, sort_order: prev.sort_order, updated_at: new Date().toISOString() }
+    cached[pIdx] = { ...prev, sort_order: current.sort_order, updated_at: new Date().toISOString() }
     saveLocal(cached)
     emitProjectChange()
-    return cached[firstIdx]
+    return cached[cIdx]
   },
 
-  moveProjectDown(parentId: string | null): Project | undefined {
-    const siblings = cached.filter(p => p.parent_id === parentId).sort((a, b) => a.sort_order - b.sort_order)
+  // Move the given project down: swap with the immediately following sibling (higher sort_order)
+  moveProjectDown(parentId: string | null, projectId: string): Project | undefined {
+    const siblings = cached.filter(p => p.parent_id === parentId).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     if (siblings.length <= 1) return undefined
-    const [prev, last] = [siblings[siblings.length - 2], siblings[siblings.length - 1]]
-    const prevIdx = cached.findIndex(p => p.id === prev.id)
-    const lastIdx = cached.findIndex(p => p.id === last.id)
-    if (prevIdx === -1 || lastIdx === -1) return undefined
-    cached[prevIdx] = { ...prev, sort_order: last.sort_order, updated_at: new Date().toISOString() }
-    cached[lastIdx] = { ...last, sort_order: prev.sort_order, updated_at: new Date().toISOString() }
+    const idx = siblings.findIndex(p => p.id === projectId)
+    if (idx >= siblings.length - 1) return undefined
+    const [current, next] = [siblings[idx], siblings[idx + 1]]
+    // Swap sort_orders in cached
+    const cIdx = cached.findIndex(p => p.id === current.id)
+    const nIdx = cached.findIndex(p => p.id === next.id)
+    if (cIdx === -1 || nIdx === -1) return undefined
+    cached[cIdx] = { ...current, sort_order: next.sort_order, updated_at: new Date().toISOString() }
+    cached[nIdx] = { ...next, sort_order: current.sort_order, updated_at: new Date().toISOString() }
     saveLocal(cached)
     emitProjectChange()
-    return cached[lastIdx]
+    return cached[cIdx]
   },
 
   moveTodoUp(todoId: string): Todo | undefined {
