@@ -105,10 +105,12 @@ function GanttPage() {
   // ── Todo reorder handlers ──
   const handleMoveTodoUp = useCallback((todoId: string) => {
     projectStore.moveTodoUp(todoId)
+    setTodos([...projectStore.getTodos()])
   }, [])
 
   const handleMoveTodoDown = useCallback((todoId: string) => {
     projectStore.moveTodoDown(todoId)
+    setTodos([...projectStore.getTodos()])
   }, [])
 
   // ── Filtering ──
@@ -431,16 +433,35 @@ function GanttPage() {
   }, [remove])
 
   // ── Build sidebar rows list (same DOM order as right SVG) + isFirstSibling/isLastSibling ──
+  // Rules:
+  //   Root projects sort among OTHER root projects (parent_id === null)
+  //   Sub-projects sort among sub-projects with the same parent_id
+  //   Sub-projects within an expanded group: arrows based on position in root+children sibling group
+  //   Root projects: arrows based on position among ALL root projects
   const sidebarRows = useMemo(() => {
+    const allRoots = projects.filter(p => p.parent_id === null)
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    const rootIndexMap = new Map<string, number>()
+    allRoots.forEach((r, i) => { rootIndexMap.set(r.id, i) })
+    const totalRoots = allRoots.length
+
     const rows: Array<{ project: Project; isRoot: boolean; groupId: string; isFirstSibling: boolean; isLastSibling: boolean }> = []
     for (const group of filteredGroups) {
       const rootProject = projects.find(p => p.id === group.projectId)
       if (!rootProject) continue
+      const rootIdx = rootIndexMap.get(rootProject.id) ?? 0
+      const isRootFirst = rootIdx === 0
+      const isRootLast = rootIdx === totalRoots - 1
       const isExpanded = expandedParents.has(group.projectId)
-      // Root is always first and last among itself
-      rows.push({ project: rootProject, isRoot: true, groupId: group.projectId, isFirstSibling: true, isLastSibling: true })
+
+      // Root row with arrows based on position among all roots
+      rows.push({
+        project: rootProject, isRoot: true, groupId: group.projectId,
+        isFirstSibling: isRootFirst, isLastSibling: isRootLast,
+      })
+
       if (isExpanded) {
-        // Build sibling list for children
+        // Root + children form one sibling group — sort by sort_order
         const allChildren = [rootProject, ...group.subProjects].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
         const total = allChildren.length
         allChildren.forEach((child, i) => {
@@ -992,20 +1013,26 @@ function GanttPage() {
                   {todo.priority === 'high' ? '高' : todo.priority === 'medium' ? '中' : '低'}
                 </span>
 
-                {/* Reorder arrows */}
+                {/* Reorder arrows — first: only ▼, last: only ▲, middle: both */}
                 <div className="flex flex-col gap-0 pointer-events-auto">
-                  <span
-                    className="cursor-pointer hover:bg-blue-200 rounded w-[12px] h-[8px] flex items-center justify-center text-[6px] text-gray-400 hover:text-blue-600"
-                    onClick={(e) => { e.stopPropagation(); handleMoveTodoUp(todo.id) }}
-                  >
-                    ▲
-                  </span>
-                  <span
-                    className="cursor-pointer hover:bg-blue-200 rounded w-[12px] h-[8px] flex items-center justify-center text-[6px] text-gray-400 hover:text-blue-600"
-                    onClick={(e) => { e.stopPropagation(); handleMoveTodoDown(todo.id) }}
-                  >
-                    ▼
-                  </span>
+                  {sortedTodos.indexOf(todo) > 0 && (
+                    <span
+                      className="cursor-pointer hover:bg-blue-200 rounded w-[12px] h-[8px] flex items-center justify-center text-[6px] text-gray-400 hover:text-blue-600"
+                      onClick={(e) => { e.stopPropagation(); handleMoveTodoUp(todo.id) }}
+                      title="上移"
+                    >
+                      ▲
+                    </span>
+                  )}
+                  {sortedTodos.indexOf(todo) < sortedTodos.length - 1 && (
+                    <span
+                      className="cursor-pointer hover:bg-blue-200 rounded w-[12px] h-[8px] flex items-center justify-center text-[6px] text-gray-400 hover:text-blue-600"
+                      onClick={(e) => { e.stopPropagation(); handleMoveTodoDown(todo.id) }}
+                      title="下移"
+                    >
+                      ▼
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
