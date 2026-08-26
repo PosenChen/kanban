@@ -36,6 +36,7 @@ function buildRowGroups(projects: Project[]): { projectId: string; subProjects: 
 interface DayHeader {
   dateStr: string
   dayNum: number
+  month: number
   isMonthStart: boolean
   dayOfWeek: number
 }
@@ -282,6 +283,7 @@ function GanttPage() {
       headers.push({
         dateStr: dateToStr(d),
         dayNum: d.getDate(),
+        month: d.getMonth() + 1,
         isMonthStart: d.getDate() === 1,
         dayOfWeek: d.getDay(),
       })
@@ -429,7 +431,7 @@ function GanttPage() {
   }, [filteredGroups, projects, expandedParents])
 
   // ── Gantt bar render helper ──
-  const renderBar = (project: Project) => {
+  const renderBar = (project: Project, yPos: number, rowHeight: number) => {
     const startMs = localDate(project.start_date).getTime()
     const endMs = localDate(project.end_date).getTime()
     const viewStartMs = localDate(viewStart).getTime()
@@ -443,15 +445,19 @@ function GanttPage() {
     const offsetDays = Math.max(0, (startMs - viewStartMs) / 86400000)
     const barWidth = Math.max(barDays * DAY_WIDTH, DAY_WIDTH)
     const x = offsetDays * DAY_WIDTH
+    const barY = yPos + 2
+    const barH = rowHeight - 4
 
     return (
       <rect
         x={x}
+        y={barY}
         width={barWidth}
-        fill={statusColorMap[project.status] || '#3B82F6'}
+        height={barH}
         rx={3} ry={3}
+        fill={statusColorMap[project.status] || '#3B82F6'}
         onClick={() => handleProjectClick(project.id)}
-        style={{ pointerEvents: 'none' }}
+        style={{ pointerEvents: 'auto', cursor: 'pointer' }}
       />
     )
   }
@@ -695,6 +701,29 @@ function GanttPage() {
                       stroke={h.isMonthStart ? '#d1d5db' : '#e5e7eb'}
                       strokeWidth={h.isMonthStart ? 1.5 : 0.5}
                     />
+                    {/* Day number centered in column */}
+                    <text
+                      x={xPos + DAY_WIDTH / 2}
+                      y={16}
+                      textAnchor="middle"
+                      className="fill-gray-600"
+                      fontSize="8"
+                    >
+                      {h.dayNum}
+                    </text>
+                    {/* Month label on first day of month */}
+                    {h.isMonthStart && (
+                      <text
+                        x={xPos}
+                        y={HEADER_HEIGHT - 4}
+                        textAnchor="start"
+                        className="fill-blue-600 font-bold"
+                        fontSize="8"
+                      >
+                        {h.month}/{h.dayNum}
+                      </text>
+                    )}
+                    {/* Invisible click target */}
                     <rect
                       x={xPos} y={0} width={DAY_WIDTH} height={HEADER_HEIGHT}
                       fill="transparent"
@@ -717,6 +746,21 @@ function GanttPage() {
                 fill="#fef2f2" opacity={0.6}
                 pointerEvents="none"
               />
+              <rect
+                x={todayOffset + 2} y={HEADER_HEIGHT - 2}
+                width={DAY_WIDTH - 4} height={16} rx={4} fill="#ef4444"
+                pointerEvents="none"
+              />
+              <text
+                x={todayOffset + DAY_WIDTH / 2}
+                y={HEADER_HEIGHT + 10}
+                textAnchor="middle"
+                className="fill-white font-bold"
+                fontSize="8"
+                pointerEvents="none"
+              >
+                Today
+              </text>
 
               {/* Milestone row */}
               <rect
@@ -755,12 +799,19 @@ function GanttPage() {
               {/* Project rows with bars */}
               {svgRows.map((row, idx) => {
                 const project = row.project
+                const barRect = renderBar(project, row.y, row.h)
                 return (
                   <g key={`row-${project.id}-${idx}`}>
-                    {/* Row background */}
-                    <rect x={0} y={row.y} width={totalWidth} height={row.h} fill={idx % 2 === 0 ? '#ffffff' : '#fafafa'} />
+                    {/* Row background — clickable to open project detail */}
+                    <rect
+                      x={0} y={row.y}
+                      width={totalWidth} height={row.h}
+                      fill={idx % 2 === 0 ? '#ffffff' : '#fafafa'}
+                      onClick={() => handleProjectClick(project.id)}
+                      style={{ cursor: 'pointer' }}
+                    />
                     {/* Gantt bar */}
-                    {renderBar(project)}
+                    {barRect}
                   </g>
                 )
               })}
