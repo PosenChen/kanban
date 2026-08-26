@@ -2,7 +2,14 @@
 
 一個開源的個人專案管理工具，結合 **甘特圖（Gantt Chart）**、**看板（Kanban Board）**、**日曆視圖** 與 **待辦管理**，助力個人專案規劃與追蹤。
 
-部署站點：<https://posenchen.github.io/kanban/>
+| 項目 | 說明 |
+|------|------|
+| 🌐 **部署站點** | [posenchen.github.io/kanban](https://posenchen.github.io/kanban/) |
+| 📅 **專案啟動** | 2026-08-22 |
+| 🔄 **最新版本** | 2026-08-26 |
+| 📦 **技術棧** | React 19 + TypeScript + Vite 8 + Tailwind CSS v4 |
+| 🐙 **原始碼** | [PosenChen/kanban](https://github.com/PosenChen/kanban) |
+| 📊 **同步倉庫** | [PosenChen/kanban-data](https://github.com/PosenChen/kanban-data) |
 
 ---
 
@@ -18,6 +25,7 @@
 | **待辦事項** | 名稱/優先級/說明，CRUD 操作，完成狀態標記 |
 | **搜尋與篩選** | 全文搜尋 + 狀態/優先級/標籤多條件篩選 |
 | **專案複製** | 一鍵複製專案與活動，同名自動加 `Q` 後綴 |
+| **排序功能** | 父專案順序、子專案順序、待辦事項排序，含拖曳按鈕 UI |
 | **數據同步** | LocalStorage 本地儲存 + GitHub API 雲端備份（手動/自動） |
 | **資料備份/還原** | JSON 匯出/匯入，完整備份專案、活動與待辦 |
 
@@ -30,6 +38,7 @@
 - **路由**: React Router v7 (HashRouter)
 - **樣式**: Tailwind CSS v4 + Autoprefixer
 - **甘特圖庫**: frappe-gantt v1
+- **狀態管理**: React hooks (useProjects)
 - **數據持久化**: LocalStorage + GitHub API (posenchen/kanban-data)
 - **部署**: GitHub Pages (GitHub Actions CI/CD)
 
@@ -92,6 +101,19 @@
 - Fix: 甘特圖色塊長度計算 — 使用專案自身日期計算條長
 - Fix: 修正 UTF-8 中文字亂碼 — 使用 TextEncoder/TextDecoder 正確編解碼
 - Fix: 修復 GitHub 讀取功能 — 模板字串修正 + 下載按鈕
+
+### 🗓️ 2026-08-26 — 排序功能與同步修正
+
+**排序功能（新功能）：**
+- feat: 新增排序功能 — 父專案順序、子專案順序、待辦事項順序，含拖曳按鈕 UI
+- fix: 排序按鈕 12×8 → 14×10，字體 6 → 8px
+
+**數據類型擴展：**
+- `sort_order` 欄位加入 Project 與 Todo 類型（0 = 頂部，數值越大越往後）
+
+**GitHub 同步修正：**
+- fix: loadFromGitHub 不再強制覆蓋狀態，只對 milestone 狀態做 migration
+- fix: migration 只補 missing sort_order，不覆蓋既有狀態
 
 ---
 
@@ -165,6 +187,7 @@ npm run preview
 | name | string | 專案名稱 |
 | description | string | 專案描述 |
 | parent_id | string \| null | 父專案 ID（支援子專案分層） |
+| sort_order | number | 排序權重（0 = 頂部，數值越大越往後） |
 | start_date | string | 開始日期 (YYYY-MM-DD) |
 | end_date | string | 結束日期 (YYYY-MM-DD) |
 | status | ProjectStatus | 狀態：準備中/等待中/進行中/已完成 |
@@ -181,6 +204,7 @@ npm run preview
 | date | string | 活動日期 (YYYY-MM-DD) |
 | tags | string[] | 標籤陣列 |
 | description | string | 活動說明 |
+| created_at / updated_at | string | ISO-8601 時間戳 |
 
 ### Todo（待辦）
 | 欄位 | 類型 | 說明 |
@@ -188,6 +212,7 @@ npm run preview
 | id | string | 唯一識別碼 |
 | name | string | 待辦名稱 |
 | priority | ProjectPriority | 優先級：高/中/低 |
+| sort_order | number | 排序權重（0 = 頂部） |
 | description | string | 待辦說明 |
 | completed | boolean | 完成狀態 |
 
@@ -196,9 +221,11 @@ npm run preview
 ## 🗺️ Roadmap
 
 - [ ] 活動甘特圖條整合（活動條顯示於甘特圖上）
-- [ ] 待辦事項的日期關聯
+- [ ] 待辦事项的日期關聯
 - [ ] 專案子任務管理
 - [ ] 更多視覺自訂選項
+- [x] 排序功能（排序按鈕 UI）
+- [x] GitHub 同步狀態 migration 修正
 
 ---
 
@@ -208,4 +235,4 @@ MIT
 
 ---
 
-*Built with ❤️ using React, TypeScript, and Tailwind CSS*
+*最後更新：2026-08-26*
