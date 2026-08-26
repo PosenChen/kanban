@@ -11,15 +11,17 @@ const FROZEN_COLS = 4     // freeze left 4 date columns = 96px
 const FROZEN_WIDTH = FROZEN_COLS * DAY_WIDTH  // 96px
 const PARENT_ROW_HEIGHT = 24  // parent row height
 const SUB_ROW_HEIGHT = 20      // sub-project row height
-const SIDEBAR_WIDTH = 200
+const MILESTONE_ROW_HEIGHT = 32
+const SIDEBAR_LABEL_MAX = 82
+const SIDEBAR_EXPAND_BTN = 42
 
 // Parse a YYYY-MM-DD string as a local-date midnight (not UTC)
 function localDate(str: string): Date {
   const [y, m, d] = str.split('-').map(Number)
-  return new Date(y, m - 1, d) // Date constructor uses local timezone
+  return new Date(y, m - 1, d)
 }
 
-/** Group projects by parent: root projects get their own row; sub-projects share a row group */
+/** Group projects by parent */
 function buildRowGroups(projects: Project[]): { projectId: string; subProjects: Project[] }[] {
   const roots = projects.filter(p => p.parent_id === null)
   const groups: { projectId: string; subProjects: Project[] }[] = []
@@ -33,10 +35,13 @@ function buildRowGroups(projects: Project[]): { projectId: string; subProjects: 
 interface DayHeader {
   dateStr: string
   dayNum: number
-  month: number
-  year: number
   isMonthStart: boolean
-  dayOfWeek: number // 0=Sun, 6=Sat
+  dayOfWeek: number
+}
+
+function truncateName(name: string, maxChars: number): string {
+  if (name.length <= maxChars) return name
+  return name.slice(0, maxChars - 1) + '…'
 }
 
 function GanttPage() {
@@ -48,12 +53,10 @@ function GanttPage() {
   // ── View state ──
   const [viewStart, setViewStart] = useState(() => {
     if (!projects.length) return dateToStr(new Date())
-    // Include milestones in the view range
     const allDates = projects.map(p => p.start_date)
     const milestoneDates = milestones.map(m => m.date)
     const all = [...allDates, ...milestoneDates]
-    const firstDate = all.reduce((min, d) => (d < min ? d : min), all[0])
-    return firstDate
+    return all.reduce((min, d) => (d < min ? d : min), all[0])
   })
 
   // ── Filter ──
@@ -61,16 +64,12 @@ function GanttPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
-
-  // ── Expanded state ──
-  // Start empty: all parent projects are collapsed by default
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set())
 
   const toggleExpand = useCallback((parentId: string) => {
     setExpandedParents(prev => {
       const next = new Set(prev)
-      if (next.has(parentId)) next.delete(parentId)
-      else next.add(parentId)
+      next.has(parentId) ? next.delete(parentId) : next.add(parentId)
       return next
     })
   }, [])
@@ -92,7 +91,6 @@ function GanttPage() {
     return list
   }, [projects, searchQuery, statusFilter, priorityFilter, selectedTags])
 
-  // Build row groups from filtered projects
   const filteredGroups = useMemo(() => {
     const filteredIds = new Set(filteredList.map(p => p.id))
     const filteredRoots = filteredList.filter(p => p.parent_id === null && filteredIds.has(p.id))
@@ -115,7 +113,6 @@ function GanttPage() {
     setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
   }, [])
 
-  // Filter milestones by selectedTags
   const filteredMilestones = useMemo(() => {
     let list = milestones
     if (selectedTags.length > 0) {
@@ -123,8 +120,6 @@ function GanttPage() {
     }
     return list
   }, [milestones, selectedTags])
-
-  // No auto-expand: user controls which parents to expand
 
   // Listen for milestone changes
   useEffect(() => {
@@ -277,8 +272,7 @@ function GanttPage() {
   // ── View range ──
   const { dateHeaders, viewEndStr } = useMemo(() => {
     const startDate = localDate(viewStart)
-    // Show enough days for scrolling
-    const range = 730 // 2 years
+    const range = 730
     const endDate = new Date(startDate)
     endDate.setDate(endDate.getDate() + range)
 
@@ -286,42 +280,36 @@ function GanttPage() {
     const d = new Date(startDate)
 
     while (d <= endDate) {
-      const ds = dateToStr(d)
       headers.push({
-        dateStr: ds,
+        dateStr: dateToStr(d),
         dayNum: d.getDate(),
-        month: d.getMonth() + 1,
-        year: d.getFullYear(),
         isMonthStart: d.getDate() === 1,
         dayOfWeek: d.getDay(),
       })
       d.setDate(d.getDate() + 1)
     }
 
-    return {
-      dateHeaders: headers,
-      viewEndStr: dateToStr(endDate),
-    }
+    return { dateHeaders: headers, viewEndStr: dateToStr(endDate) }
   }, [viewStart, projects])
 
   const totalWidth = dateHeaders.length * DAY_WIDTH
 
-  // Today offset
+  // Today offset relative to viewStart (day 0 = viewStart)
   const todayOffset = useMemo(() => {
     const today = dateToStr(new Date())
     const idx = dateHeaders.findIndex(h => h.dateStr === today)
     return idx >= 0 ? idx * DAY_WIDTH : 0
   }, [dateHeaders])
 
-  // ── Status color ──
+  // Status colors
   const statusColorMap: Record<string, string> = {
     preparation: '#FBBF24',
     in_progress: '#3B82F6',
     completed: '#10B981',
-    milestone: '#A855F7', // purple
+    milestone: '#A855F7',
   }
 
-  // ── Scroll helpers ──
+  // Scroll helpers
   const handleScrollLeft = useCallback(() => {
     const now = localDate(viewStart)
     now.setDate(now.getDate() - 30)
@@ -343,7 +331,7 @@ function GanttPage() {
     navigate('/settings')
   }, [navigate])
 
-  // 📥 手動從 GitHub 讀取專案資料
+  // GitHub load
   const [isLoading, setIsLoading] = useState(false)
   const handleLoadFromGitHub = useCallback(async () => {
     const token = localStorage.getItem('kanban_github_token')
@@ -363,7 +351,6 @@ function GanttPage() {
     }
   }, [])
 
-  // ── Handlers ──
   const handleDateClick = useCallback((dateStr: string) => {
     navigate(`/daily/${dateStr}`)
   }, [navigate])
@@ -393,203 +380,28 @@ function GanttPage() {
     }
   }, [remove])
 
-  // ── Render a single gantt bar ──
-  const renderBar = (project: Project, yPos: number, groupHeight: number, barHeight: number) => {
-    const startMs = localDate(project.start_date).getTime()
-    const endMs = localDate(project.end_date).getTime()
-    const viewStartMs = localDate(viewStart).getTime()
-    const viewEndMs = localDate(viewEndStr).getTime()
+  // ── Build sidebar rows list (same DOM order as right SVG) ──
+  const sidebarRows = useMemo(() => {
+    const rows: Array<{ project: Project; isRoot: boolean; groupId: string }> = []
+    for (const group of filteredGroups) {
+      const rootProject = projects.find(p => p.id === group.projectId)
+      if (!rootProject) continue
+      const isExpanded = expandedParents.has(group.projectId)
+      rows.push({ project: rootProject, isRoot: true, groupId: group.projectId })
+      if (isExpanded) {
+        for (const s of group.subProjects) {
+          rows.push({ project: s, isRoot: false, groupId: group.projectId })
+        }
+      }
+    }
+    return rows
+  }, [filteredGroups, projects, expandedParents])
 
-    if (endMs < viewStartMs || startMs > viewEndMs) return null
-
-    // Bar width = project's own duration, clamped to visible range
-    const projectDuration = Math.max(0, (endMs - startMs) / 86400000)
-    // Clamp bar to visible window
-    const clampedStart = Math.max(startMs, viewStartMs)
-    const clampedEnd = Math.min(endMs, viewEndMs)
-    const barDays = Math.max(0, (clampedEnd - clampedStart) / 86400000)
-    // X offset = position from viewStart to project start
-    const offsetDays = Math.max(0, (startMs - viewStartMs) / 86400000)
-    const barWidth = Math.max(barDays * DAY_WIDTH, DAY_WIDTH) // at least 1 day width
-    const x = offsetDays * DAY_WIDTH
-
-    // Regular bar — return a <g> with bar + name label
-    const labelX = x + 6
-    const labelFit = barWidth > 40
-    return (
-      <g key={`bar-${project.id}`}>
-        {/* Gantt bar — pointerEvents=none so sidebar label click passes through */}
-        <rect
-          x={x}
-          y={yPos + 2}
-          width={barWidth}
-          height={barHeight - 4}
-          rx={3}
-          ry={3}
-          fill={statusColorMap[project.status] || '#3B82F6'}
-          className="cursor-pointer hover:opacity-90 transition-opacity"
-          onClick={() => handleProjectClick(project.id)}
-          style={{ pointerEvents: 'none' }}
-        />
-        {/* Project name label next to bar (always visible) */}
-        {labelFit && (
-          <text
-            x={labelX}
-            y={yPos + barHeight / 2 + 2}
-            className="fill-white font-medium"
-            fontSize="9"
-          >
-            {project.name}
-          </text>
-        )}
-      </g>
-    )
-  }
-
-  // ── Render date headers ──
-  const renderDateHeaders = (headerHeight: number) => (
-    <g>
-      {/* Background */}
-      <rect x={0} y={0} width={totalWidth} height={headerHeight} fill="#f9fafb" />
-
-      {dateHeaders.map((h, i) => {
-        const xPos = i * DAY_WIDTH
-        const isWeekend = h.dayOfWeek === 0 || h.dayOfWeek === 6
-        let bgColor = '#fff'
-        if (isWeekend) bgColor = '#f3f4f6'
-
-        return (
-          <g key={i}>
-            {/* Column background — weekend = gray, milestone = subtle purple, weekday = white */}
-            <rect
-              x={xPos}
-              y={0}
-              width={DAY_WIDTH}
-              height={headerHeight}
-              fill={bgColor}
-            />
-
-            {/* Vertical grid line */}
-            <line
-              x1={xPos}
-              y1={0}
-              x2={xPos}
-              y2={headerHeight}
-              stroke={h.isMonthStart ? '#d1d5db' : '#e5e7eb'}
-              strokeWidth={h.isMonthStart ? 1.5 : 0.5}
-            />
-
-            {/* Month label (first day of month) */}
-            {h.isMonthStart && (
-              <text
-                x={xPos}
-                y={headerHeight - 6}
-                textAnchor="start"
-                className="fill-blue-600 font-bold"
-                fontSize="9"
-              >
-                {h.month}月
-              </text>
-            )}
-
-            {/* Day number on month start (larger) */}
-            {h.isMonthStart && (
-              <text
-                x={xPos + DAY_WIDTH / 2}
-                y={12}
-                textAnchor="middle"
-                className="fill-gray-800 font-bold"
-                fontSize="10"
-              >
-                {h.dayNum}
-              </text>
-            )}
-
-            {/* Day number for all days (small) */}
-            {!h.isMonthStart && (
-              <text
-                x={xPos + DAY_WIDTH / 2}
-                y={14}
-                textAnchor="middle"
-                className="fill-gray-600"
-                fontSize="8"
-              >
-                {h.dayNum}
-              </text>
-            )}
-          </g>
-        )
-      })}
-
-      {/* Clickable date cells */}
-      {dateHeaders.map((h, i) => (
-        <rect
-          key={`click-${i}`}
-          x={i * DAY_WIDTH}
-          y={0}
-          width={DAY_WIDTH}
-          height={headerHeight}
-          fill="transparent"
-          onClick={() => handleDateClick(h.dateStr)}
-          className="cursor-pointer"
-        />
-      ))}
-
-      {/* Today vertical line — solid red line */}
-      <line
-        x1={todayOffset}
-        y1={headerHeight}
-        x2={todayOffset}
-        y2={totalGanttHeight}
-        stroke="#ef4444"
-        strokeWidth={2.5}
-      />
-
-      {/* Today vertical highlight band — light red column */}
-      <rect
-        x={todayOffset}
-        y={0}
-        width={DAY_WIDTH}
-        height={totalGanttHeight}
-        fill="#fef2f2"
-        opacity={0.6}
-        pointerEvents="none"
-      />
-
-      {/* Today label in date header */}
-      <rect
-        x={todayOffset + DAY_WIDTH / 2 - 20}
-        y={headerHeight - 2}
-        width={40}
-        height={16}
-        rx={4}
-        fill="#ef4444"
-        pointerEvents="none"
-      />
-      <text
-        x={todayOffset + DAY_WIDTH / 2}
-        y={headerHeight + 10}
-        textAnchor="middle"
-        className="fill-white font-bold"
-        fontSize="8"
-        pointerEvents="none"
-      >
-        Today
-      </text>
-    </g>
-  )
-
-  const headerHeight = 28
-  const MILESTONE_ROW_HEIGHT = 32
-
-  // ── Calculate total pixel height ──
-  // Each root project row is PARENT_ROW_HEIGHT. Each sub-project row is SUB_ROW_HEIGHT.
+  // ── Compute y-offset for each row index ──
   const totalGanttHeight = useMemo(() => {
     let height = MILESTONE_ROW_HEIGHT
     for (const group of filteredGroups) {
-      // Parent row
       height += PARENT_ROW_HEIGHT
-      // Sub-projects (if expanded)
       if (expandedParents.has(group.projectId)) {
         height += group.subProjects.length * SUB_ROW_HEIGHT
       }
@@ -597,11 +409,66 @@ function GanttPage() {
     return Math.max(height, 200)
   }, [filteredGroups, expandedParents])
 
+  // Build SVG rows with y-offsets
+  const svgRows = useMemo(() => {
+    const rows: Array<{ project: Project; isRoot: boolean; y: number; h: number }> = []
+    let y = headerHeight + MILESTONE_ROW_HEIGHT
+    for (const group of filteredGroups) {
+      const rootProject = projects.find(p => p.id === group.projectId)
+      if (!rootProject) continue
+      rows.push({ project: rootProject, isRoot: true, y, h: PARENT_ROW_HEIGHT })
+      y += PARENT_ROW_HEIGHT
+      const isExpanded = expandedParents.has(group.projectId)
+      if (isExpanded) {
+        for (const s of group.subProjects) {
+          rows.push({ project: s, isRoot: false, y, h: SUB_ROW_HEIGHT })
+          y += SUB_ROW_HEIGHT
+        }
+      }
+    }
+    return rows
+  }, [filteredGroups, projects, expandedParents])
+
+  // Compute cumulative offset for a given row index in svgRows
+  const rowYAt = useCallback((idx: number) => {
+    if (idx === 0) return headerHeight + MILESTONE_ROW_HEIGHT
+    return svgRows[idx - 1].y + svgRows[idx - 1].h
+  }, [svgRows])
+
+  const headerHeight = 28
+
+  // ── Gantt bar render helper ──
+  const renderBar = (project: Project) => {
+    const startMs = localDate(project.start_date).getTime()
+    const endMs = localDate(project.end_date).getTime()
+    const viewStartMs = localDate(viewStart).getTime()
+    const viewEndMs = localDate(viewEndStr).getTime()
+
+    if (endMs < viewStartMs || startMs > viewEndMs) return null
+
+    const clampedStart = Math.max(startMs, viewStartMs)
+    const clampedEnd = Math.min(endMs, viewEndMs)
+    const barDays = Math.max(0, (clampedEnd - clampedStart) / 86400000)
+    const offsetDays = Math.max(0, (startMs - viewStartMs) / 86400000)
+    const barWidth = Math.max(barDays * DAY_WIDTH, DAY_WIDTH)
+    const x = offsetDays * DAY_WIDTH
+
+    return (
+      <rect
+        x={x}
+        width={barWidth}
+        fill={statusColorMap[project.status] || '#3B82F6'}
+        rx={3} ry={3}
+        onClick={() => handleProjectClick(project.id)}
+        style={{ pointerEvents: 'none' }}
+      />
+    )
+  }
+
   return (
     <div className="space-y-3">
       {/* Toolbar */}
       <div className="bg-white rounded-lg border border-gray-200 p-3 space-y-3">
-        {/* Search + Actions */}
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
             <input
@@ -715,284 +582,197 @@ function GanttPage() {
         </div>
       </div>
 
-      {/* Gantt Chart — frozen sidebar + scrollable area */}
+      {/* Gantt Chart — frozen sidebar + scrollable right */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        {/* Toolbar: scroll controls + zoom */}
+        {/* Scroll controls bar */}
         <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            {/* Scroll buttons */}
-            <button
-              onClick={handleScrollLeft}
-              className="p-1 text-gray-500 hover:text-blue-500 hover:bg-gray-200 rounded transition-colors"
-              title="往前（左）"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
+            <button onClick={handleScrollLeft} className="p-1 text-gray-500 hover:text-blue-500 hover:bg-gray-200 rounded transition-colors" title="往前">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             </button>
-            <button
-              onClick={handleScrollRight}
-              className="p-1 text-gray-500 hover:text-blue-500 hover:bg-gray-200 rounded transition-colors"
-              title="往後（右）"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
+            <button onClick={handleScrollRight} className="p-1 text-gray-500 hover:text-blue-500 hover:bg-gray-200 rounded transition-colors" title="往後">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
             </button>
-            <button
-              onClick={handleScrollToToday}
-              className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 transition-colors"
-              title="跳到今天"
-            >
-              今天
-            </button>
+            <button onClick={handleScrollToToday} className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 transition-colors">今天</button>
           </div>
         </div>
 
-        {/* Split layout: frozen left sidebar + scrollable right SVG */}
+        {/* Main gantt area: frozen sidebar (HTML) + scrollable right (SVG) */}
         <div className="relative" style={{ height: totalGanttHeight + headerHeight }}>
-          {/* ── Frozen left sidebar (never scrolls) ── */}
+          {/* ══════════ FROZEN LEFT SIDEBAR (HTML, never scrolls) ══════════ */}
           <div
-            className="absolute left-0 top-0 bg-white"
-            style={{ width: FROZEN_WIDTH, height: totalGanttHeight + headerHeight, overflow: 'hidden' }}
+            className="absolute left-0 top-0 bg-white overflow-hidden z-10"
+            style={{ width: SIDEBAR_WIDTH, height: totalGanttHeight + headerHeight, borderRight: '1px solid #e5e7eb' }}
           >
-            {/* Frozen date header background */}
-            <rect
-              x={0} y={0}
-              width={FROZEN_WIDTH}
-              height={headerHeight}
-              fill="#f9fafb"
-            />
-            {/* Frozen date columns (first 4) */}
-            {dateHeaders.slice(0, FROZEN_COLS).map((h, i) => {
-              const xPos = i * DAY_WIDTH
-              const isWeekend = h.dayOfWeek === 0 || h.dayOfWeek === 6
-              const bgColor = isWeekend ? '#f3f4f6' : '#fff'
-              return (
-                <g key={`fz-d-${i}`}>
-                  <rect x={xPos} y={0} width={DAY_WIDTH} height={headerHeight} fill={bgColor} />
-                  <line x1={xPos} y1={0} x2={xPos} y2={headerHeight} stroke={h.isMonthStart ? '#d1d5db' : '#e5e7eb'} strokeWidth={h.isMonthStart ? 1.5 : 0.5} />
-                  {h.isMonthStart && (
-                    <text x={xPos} y={headerHeight - 6} textAnchor="start" className="fill-blue-600 font-bold" fontSize="9">{h.month}月</text>
-                  )}
-                  {h.isMonthStart && (
-                    <text x={xPos + DAY_WIDTH / 2} y={12} textAnchor="middle" className="fill-gray-800 font-bold" fontSize="10">{h.dayNum}</text>
-                  )}
-                  {!h.isMonthStart && (
-                    <text x={xPos + DAY_WIDTH / 2} y={14} textAnchor="middle" className="fill-gray-600" fontSize="8">{h.dayNum}</text>
-                  )}
-                  {/* Left-right arrow separator at frozen boundary */}
-                  {i === FROZEN_COLS - 1 && (
-                    <text x={xPos + DAY_WIDTH / 2} y={headerHeight / 2 + 4} textAnchor="middle" className="fill-gray-400" fontSize="8">◀▶</text>
-                  )}
-                </g>
-              )
-            })}
-            {/* Today line inside frozen area (if today falls in first 4 cols) */}
-            {todayOffset < FROZEN_WIDTH && (
-              <g pointerEvents="none">
-                <line x1={todayOffset} y1={headerHeight} x2={todayOffset} y2={totalGanttHeight + headerHeight} stroke="#ef4444" strokeWidth={2.5} />
-                <rect x={todayOffset + DAY_WIDTH / 2 - 20} y={headerHeight - 2} width={40} height={16} rx={4} fill="#ef4444" />
-                <text x={todayOffset + DAY_WIDTH / 2} y={headerHeight + 10} textAnchor="middle" className="fill-white font-bold" fontSize="8">Today</text>
-              </g>
-            )}
-            {/* Frozen project labels */}
-            {(() => {
-              const rows: Array<{ project: Project; isRoot: boolean }> = []
-              for (const group of filteredGroups) {
-                const rootProject = projects.find(p => p.id === group.projectId)
-                if (!rootProject) continue
-                const isExpanded = expandedParents.has(group.projectId)
-                rows.push({ project: rootProject, isRoot: true })
-                if (isExpanded) {
-                  for (const s of group.subProjects) {
-                    rows.push({ project: s, isRoot: false })
-                  }
-                }
-              }
-              let offsetY = headerHeight + MILESTONE_ROW_HEIGHT
-              return rows.map((row) => {
+            {/* Date header row — no month/day numbers, just a thin strip */}
+            <div
+              className="flex items-center border-b border-gray-200"
+              style={{ height: headerHeight }}
+            >
+              <div className="flex-1 flex items-center px-1">
+                <span className="text-[8px] text-gray-400 font-medium truncate">專案名稱</span>
+              </div>
+              <div className="w-[42px] flex-shrink-0"></div>
+            </div>
+
+            {/* Milestone label row */}
+            <div
+              className="flex items-center border-b border-purple-200"
+              style={{ height: MILESTONE_ROW_HEIGHT, backgroundColor: '#faf5ff' }}
+            >
+              <span className="flex-1 px-1 text-[9px] text-purple-600 font-medium truncate">活動</span>
+              <div className="w-[42px] flex-shrink-0"></div>
+            </div>
+
+            {/* Project name rows — each matches right SVG row pixel-by-pixel */}
+            <div>
+              {sidebarRows.map((row, idx) => {
                 const project = row.project
                 const isRoot = row.isRoot
                 const rowHeight = isRoot ? PARENT_ROW_HEIGHT : SUB_ROW_HEIGHT
-                const yPos = offsetY
-                offsetY += rowHeight
-                const bgEven = Math.round((yPos - headerHeight - MILESTONE_ROW_HEIGHT) / 22) % 2 === 0
+                const group = filteredGroups.find(g => g.projectId === row.groupId)
+                const sc = group?.subProjects.length ?? 0
+                const exp = expandedParents.has(row.groupId)
+                const bgEven = idx % 2 === 0
 
-                if (isRoot) {
-                  // Find group for expand/collapse info
-                  const group = filteredGroups.find(g => g.projectId === project.id)
-                  const sc = group?.subProjects.length ?? 0
-                  const exp = expandedParents.has(project.id)
-                  return (
-                    <g key={`fz-root-${project.id}`}>
-                      <rect x={0} y={yPos} width={FROZEN_WIDTH} height={rowHeight} fill={bgEven ? '#fff' : '#f9fafb'} />
-                      <rect x={0} y={yPos} width={2} height={rowHeight} fill="#3B82F6" />
-                      <text x={6} y={yPos + rowHeight / 2 + 4} className="fill-gray-800 font-medium" fontSize="10">{project.name.length > 6 ? project.name.slice(0, 5) + '…' : project.name}</text>
-                      {sc > 0 && (
-                        <g className="cursor-pointer hover:brightness-110"
-                          onClick={(e) => { e.stopPropagation(); toggleExpand(project.id) }}>
-                          <rect x={6} y={yPos + 4} width={16} height={16} rx={3} fill={exp ? '#dbeafe' : '#f3f4f6'} stroke={exp ? '#3b82f6' : '#d1d5db'} strokeWidth={1} />
-                          <text x={14} y={yPos + 16} textAnchor="middle" className="fill-blue-600 font-bold" fontSize={12}>{exp ? '▼' : '▶'}</text>
-                          <rect x={24} y={yPos + 5} width={16} height={14} rx={7} fill={exp ? '#3b82f6' : '#6b7280'} />
-                          <text x={32} y={yPos + 16} textAnchor="middle" className="fill-white font-bold" fontSize="8">{sc}</text>
-                        </g>
-                      )}
-                    </g>
-                  )
-                }
-                const sub = project
                 return (
-                  <g key={`fz-sub-${sub.id}`}>
-                    <rect x={0} y={yPos} width={FROZEN_WIDTH} height={rowHeight} fill={bgEven ? '#fff' : '#f9fafb'} />
-                    <rect x={0} y={yPos} width={2} height={rowHeight} fill="#6b7280" />
-                    <text x={6} y={yPos + rowHeight / 2 + 4} className="fill-gray-600" fontSize="9">↳ {sub.name.length > 7 ? sub.name.slice(0, 6) + '…' : sub.name}</text>
-                  </g>
+                  <div
+                    key={isRoot ? `root-${project.id}` : `sub-${project.id}`}
+                    className="flex items-center border-b border-gray-100"
+                    style={{ height: rowHeight, backgroundColor: bgEven ? '#ffffff' : '#fafafa' }}
+                  >
+                    {/* Project name — CSS text-overflow: ellipsis guarantees no overflow */}
+                    <div
+                      className="flex-1 min-w-0 truncate px-1"
+                      title={project.name}
+                    >
+                      <span className={`text-[10px] truncate block leading-none ${
+                        isRoot ? 'font-medium text-gray-800' : 'text-gray-500'
+                      }`}>
+                        {isRoot
+                          ? project.name
+                          : `↳ ${project.name}`}
+                      </span>
+                    </div>
+
+                    {/* Expand / collapse button */}
+                    <div className="w-[42px] flex-shrink-0 flex items-center justify-center">
+                      {isRoot && sc > 0 && (
+                        <span
+                          className="cursor-pointer hover:brightness-110 flex items-center gap-0.5"
+                          onClick={(e) => { e.stopPropagation(); toggleExpand(project.id) }}
+                        >
+                          <span className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold transition-colors ${
+                            exp ? 'bg-blue-100 text-blue-600' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
+                          }`}>
+                            {exp ? '▼' : '▶'}
+                          </span>
+                          <span className={`text-[8px] rounded-full px-1 font-bold ${
+                            exp ? 'bg-blue-600 text-white' : 'bg-gray-500 text-white'
+                          }`}>
+                            {sc}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 )
-              })
-            })()}
+              })}
+            </div>
           </div>
 
-          {/* ── Scrollable right area (date headers + gantt bars) ── */}
+          {/* ══════════ SCROLLABLE RIGHT AREA (SVG) ══════════ */}
           <div className="absolute left-[96px] top-0 right-0 overflow-x-auto overflow-y-hidden">
             <svg
-              width={totalWidth - FROZEN_WIDTH}
+              width={totalWidth}
               height={totalGanttHeight + headerHeight}
+              className="min-w-full"
             >
-              {/* Date headers — shift left by FROZEN_WIDTH so columns align */}
-              {(() => {
-                const shiftedHeaders = dateHeaders.slice(FROZEN_COLS)
+              {/* Date header background */}
+              <rect x={0} y={0} width={totalWidth} height={headerHeight} fill="#f9fafb" />
+
+              {/* Date columns */}
+              {dateHeaders.map((h, i) => {
+                const xPos = i * DAY_WIDTH
+                const isWeekend = h.dayOfWeek === 0 || h.dayOfWeek === 6
+                const bgColor = isWeekend ? '#f3f4f6' : '#fff'
                 return (
-                  <g>
-                    <rect x={0} y={0} width={totalWidth - FROZEN_WIDTH} height={headerHeight} fill="#f9fafb" />
-                    {shiftedHeaders.map((h, i) => {
-                      const xPos = i * DAY_WIDTH
-                      const isWeekend = h.dayOfWeek === 0 || h.dayOfWeek === 6
-                      const bgColor = isWeekend ? '#f3f4f6' : '#fff'
-                      return (
-                        <g key={`d-${i}`}>
-                          <rect x={xPos} y={0} width={DAY_WIDTH} height={headerHeight} fill={bgColor} />
-                          <line x1={xPos} y1={0} x2={xPos} y2={headerHeight} stroke={h.isMonthStart ? '#d1d5db' : '#e5e7eb'} strokeWidth={h.isMonthStart ? 1.5 : 0.5} />
-                          {h.isMonthStart && (
-                            <text x={xPos} y={headerHeight - 6} textAnchor="start" className="fill-blue-600 font-bold" fontSize="9">{h.month}月</text>
-                          )}
-                          {h.isMonthStart && (
-                            <text x={xPos + DAY_WIDTH / 2} y={12} textAnchor="middle" className="fill-gray-800 font-bold" fontSize="10">{h.dayNum}</text>
-                          )}
-                          {!h.isMonthStart && (
-                            <text x={xPos + DAY_WIDTH / 2} y={14} textAnchor="middle" className="fill-gray-600" fontSize="8">{h.dayNum}</text>
-                          )}
-                          <rect
-                            x={xPos} y={0} width={DAY_WIDTH} height={headerHeight}
-                            fill="transparent"
-                            onClick={() => handleDateClick(h.dateStr)}
-                            className="cursor-pointer"
-                          />
-                        </g>
-                      )
-                    })}
-                    {/* Today line (if today is after frozen area) */}
-                    {todayOffset >= FROZEN_WIDTH && (
-                      <g pointerEvents="none">
-                        <line
-                          x1={todayOffset - FROZEN_WIDTH} y1={headerHeight}
-                          x2={todayOffset - FROZEN_WIDTH} y2={totalGanttHeight + headerHeight}
-                          stroke="#ef4444" strokeWidth={2.5}
-                        />
-                        <rect
-                          x={todayOffset - FROZEN_WIDTH} y={headerHeight - 2}
-                          width={DAY_WIDTH} height={16} rx={4} fill="#fef2f2"
-                        />
-                        <text
-                          x={todayOffset - FROZEN_WIDTH + DAY_WIDTH / 2}
-                          y={headerHeight + 10}
-                          textAnchor="middle"
-                          className="fill-red-600 font-bold"
-                          fontSize="8"
-                        >Today</text>
-                      </g>
-                    )}
-                    {/* Milestone row */}
-                    <g key={`milestones`}>
-                      <rect
-                        x={0}
-                        y={headerHeight}
-                        width={totalWidth - FROZEN_WIDTH}
-                        height={MILESTONE_ROW_HEIGHT}
-                        fill="#faf5ff"
-                      />
-                      {filteredMilestones.map((m) => {
-                        const mIdx = dateHeaders.findIndex(h => h.dateStr === m.date)
-                        if (mIdx < FROZEN_COLS) return null // hidden in frozen area
-                        const localIdx = mIdx - FROZEN_COLS
-                        const mX = localIdx * DAY_WIDTH
-                        const colRight = (localIdx + 1) * DAY_WIDTH
-                        return (
-                          <g key={`me-${m.id}`}>
-                            <rect
-                              x={mX} y={headerHeight + 6}
-                              width={20} height={16} rx={4} fill="#A855F7" opacity={0.9}
-                            />
-                            <polygon
-                              points={`${mX + 20},${headerHeight + 14} ${mX + 20},${headerHeight + 18} ${colRight},${headerHeight + 16}`}
-                              fill="#A855F7" opacity={0.9}
-                            />
-                            <text
-                              x={colRight + 4}
-                              y={headerHeight + 18}
-                              className="fill-gray-700 cursor-pointer hover:underline"
-                              fontSize="9"
-                              onClick={() => openEditActivity(m)}
-                            >
-                              {m.name}
-                            </text>
-                          </g>
-                        )
-                      })}
-                    </g>
-
-                    {/* All project rows with correct pixel offsets */}
-                    {(() => {
-                      const rows: Array<{ project: Project; isRoot: boolean }> = []
-                      for (const group of filteredGroups) {
-                        const rootProject = projects.find(p => p.id === group.projectId)
-                        if (!rootProject) continue
-                        const isExpanded = expandedParents.has(group.projectId)
-                        rows.push({ project: rootProject, isRoot: true })
-                        if (isExpanded) {
-                          for (const s of group.subProjects) {
-                            rows.push({ project: s, isRoot: false })
-                          }
-                        }
-                      }
-                      let offsetY = headerHeight + MILESTONE_ROW_HEIGHT
-                      return rows.map((row) => {
-                        const project = row.project
-                        const isRoot = row.isRoot
-                        const rowHeight = isRoot ? PARENT_ROW_HEIGHT : SUB_ROW_HEIGHT
-                        const yPos = offsetY
-                        offsetY += rowHeight
-
-                        if (isRoot) {
-                          return (
-                            <g key={`root-${project.id}`}>
-                              <rect x={0} y={yPos} width={totalWidth - FROZEN_WIDTH} height={rowHeight} fill="#fff" />
-                              {renderBar(project, yPos, rowHeight, rowHeight - 6)}
-                            </g>
-                          )
-                        }
-                        const sub = project
-                        return (
-                          <g key={`sub-${sub.id}`}>
-                            <rect x={0} y={yPos} width={totalWidth - FROZEN_WIDTH} height={rowHeight} fill="#fff" />
-                            {renderBar(sub, yPos, rowHeight, rowHeight - 6)}
-                          </g>
-                        )
-                      })
-                    })()}
+                  <g key={`col-${i}`}>
+                    <rect x={xPos} y={0} width={DAY_WIDTH} height={headerHeight} fill={bgColor} />
+                    <line
+                      x1={xPos} y1={0} x2={xPos} y2={headerHeight}
+                      stroke={h.isMonthStart ? '#d1d5db' : '#e5e7eb'}
+                      strokeWidth={h.isMonthStart ? 1.5 : 0.5}
+                    />
+                    <rect
+                      x={xPos} y={0} width={DAY_WIDTH} height={headerHeight}
+                      fill="transparent"
+                      onClick={() => handleDateClick(h.dateStr)}
+                      className="cursor-pointer"
+                    />
                   </g>
                 )
-              })()}
+              })}
+
+              {/* Today highlight */}
+              <line
+                x1={todayOffset} y1={headerHeight}
+                x2={todayOffset} y2={totalGanttHeight + headerHeight}
+                stroke="#ef4444" strokeWidth={2.5}
+              />
+              <rect
+                x={todayOffset} y={0}
+                width={DAY_WIDTH} height={totalGanttHeight + headerHeight}
+                fill="#fef2f2" opacity={0.6}
+                pointerEvents="none"
+              />
+
+              {/* Milestone row */}
+              <rect
+                x={0} y={headerHeight}
+                width={totalWidth} height={MILESTONE_ROW_HEIGHT}
+                fill="#faf5ff"
+              />
+              {filteredMilestones.map((m) => {
+                const mIdx = dateHeaders.findIndex(h => h.dateStr === m.date)
+                if (mIdx < 0) return null
+                const mX = mIdx * DAY_WIDTH
+                const colRight = (mIdx + 1) * DAY_WIDTH
+                return (
+                  <g key={`me-${m.id}`}>
+                    <rect
+                      x={mX} y={headerHeight + 6}
+                      width={20} height={16} rx={4} fill="#A855F7" opacity={0.9}
+                    />
+                    <polygon
+                      points={`${mX + 20},${headerHeight + 14} ${mX + 20},${headerHeight + 18} ${colRight},${headerHeight + 16}`}
+                      fill="#A855F7" opacity={0.9}
+                    />
+                    <text
+                      x={colRight + 4}
+                      y={headerHeight + 18}
+                      className="fill-gray-700 cursor-pointer hover:underline"
+                      fontSize="9"
+                      onClick={() => openEditActivity(m)}
+                    >
+                      {m.name}
+                    </text>
+                  </g>
+                )
+              })}
+
+              {/* Project rows with bars */}
+              {svgRows.map((row, idx) => {
+                const project = row.project
+                return (
+                  <g key={`row-${project.id}-${idx}`}>
+                    {/* Row background */}
+                    <rect x={0} y={row.y} width={totalWidth} height={row.h} fill={idx % 2 === 0 ? '#ffffff' : '#fafafa'} />
+                    {/* Gantt bar */}
+                    {renderBar(project)}
+                  </g>
+                )
+              })}
             </svg>
           </div>
         </div>
@@ -1032,7 +812,6 @@ function GanttPage() {
                     : 'bg-white border-gray-200 hover:border-gray-300'
                 }`}
               >
-                {/* Checkbox */}
                 <button
                   onClick={() => handleToggleTodo(todo.id)}
                   className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
@@ -1048,13 +827,11 @@ function GanttPage() {
                   )}
                 </button>
 
-                {/* Priority indicator */}
                 <div
                   className="w-2 h-2 rounded-full flex-shrink-0"
                   style={{ backgroundColor: todo.priority === 'high' ? '#ef4444' : todo.priority === 'medium' ? '#eab308' : '#9ca3af' }}
                 />
 
-                {/* Name */}
                 <span
                   className={`flex-1 text-sm cursor-pointer ${
                     todo.completed
@@ -1066,7 +843,6 @@ function GanttPage() {
                   {todo.name}
                 </span>
 
-                {/* Priority label */}
                 <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
                   todo.priority === 'high' ? 'text-red-600 bg-red-50' :
                   todo.priority === 'medium' ? 'text-yellow-600 bg-yellow-50' :
@@ -1130,48 +906,36 @@ function GanttPage() {
               </div>
               {editingActivity && (
                 <div className="flex gap-2 pt-1 text-xs">
-                  <button
-                    onClick={() => {
-                      projectStore.addMilestone({
-                        name: editingActivity.name + 'Q',
-                        date: editingActivity.date,
-                        tags: editingActivity.tags,
-                        description: editingActivity.description,
-                      })
-                      setShowActivityModal(false)
-                      setEditingActivity(null)
-                    }}
-                    className="text-blue-500 hover:text-blue-700 underline"
-                  >
+                  <button onClick={() => {
+                    projectStore.addMilestone({
+                      name: editingActivity.name + 'Q',
+                      date: editingActivity.date,
+                      tags: editingActivity.tags,
+                      description: editingActivity.description,
+                    })
+                    setShowActivityModal(false)
+                    setEditingActivity(null)
+                  }} className="text-blue-500 hover:text-blue-700 underline">
                     複製這個活動
                   </button>
-                  <button
-                    onClick={() => handleDeleteActivity(editingActivity.id)}
-                    className="text-red-500 hover:text-red-700 underline"
-                  >
+                  <button onClick={() => handleDeleteActivity(editingActivity.id)} className="text-red-500 hover:text-red-700 underline">
                     刪除這個活動
                   </button>
                 </div>
               )}
               <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => { setShowActivityModal(false); setEditingActivity(null) }}
-                  className="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
-                >
+                <button onClick={() => { setShowActivityModal(false); setEditingActivity(null) }} className="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">
                   取消
                 </button>
-                <button
-                  onClick={handleSaveActivity}
-                  disabled={!activityName.trim()}
-                  className="flex-1 px-3 py-2 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
+                <button onClick={handleSaveActivity} disabled={!activityName.trim()} className="flex-1 px-3 py-2 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                   {editingActivity ? '儲存' : '新增'}
                 </button>
               </div>
             </div>
           </div>
         </div>
-      )}\n\n
+      )}
+
       {/* Add/edit todo modal */}
       {showTodoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
@@ -1215,32 +979,19 @@ function GanttPage() {
               </div>
               {editingTodo && (
                 <div className="flex gap-2 pt-1 text-xs">
-                  <button
-                    onClick={handleCopyTodo}
-                    className="text-blue-500 hover:text-blue-700 underline"
-                  >
+                  <button onClick={handleCopyTodo} className="text-blue-500 hover:text-blue-700 underline">
                     複製這個待辦
                   </button>
-                  <button
-                    onClick={() => handleDeleteTodo(editingTodo.id)}
-                    className="text-red-500 hover:text-red-700 underline"
-                  >
+                  <button onClick={() => handleDeleteTodo(editingTodo.id)} className="text-red-500 hover:text-red-700 underline">
                     刪除這個待辦
                   </button>
                 </div>
               )}
               <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => { setShowTodoModal(false); setEditingTodo(null) }}
-                  className="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
-                >
+                <button onClick={() => { setShowTodoModal(false); setEditingTodo(null) }} className="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">
                   取消
                 </button>
-                <button
-                  onClick={handleSaveTodo}
-                  disabled={!todoName.trim()}
-                  className="flex-1 px-3 py-2 text-sm bg-teal-500 text-white rounded-lg hover:bg-teal-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
+                <button onClick={handleSaveTodo} disabled={!todoName.trim()} className="flex-1 px-3 py-2 text-sm bg-teal-500 text-white rounded-lg hover:bg-teal-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                   {editingTodo ? '儲存' : '新增'}
                 </button>
               </div>
