@@ -17,203 +17,320 @@ function DailyPage() {
   if (!targetDate) {
     targetDate = dateToStr(new Date())
   }
+  const target = new Date(targetDate + 'T00:00:00')
 
   const dayOfWeek = getDayOfWeek(targetDate)
-  const nextDate = dateParam ? new Date(dateParam + 'T00:00:00') : new Date()
-  nextDate.setDate(nextDate.getDate() + 1)
-  const prevDate = new Date(targetDate + 'T00:00:00')
-  prevDate.setDate(prevDate.getDate() - 1)
 
-  // Categorize projects
+  // ── Categories ──
   const inProgress = projects.filter(p => p.start_date <= targetDate && p.end_date >= targetDate && p.status === 'in_progress')
   const preparing = projects.filter(p => p.start_date <= targetDate && p.end_date >= targetDate && p.status === 'preparation')
   const completingToday = projects.filter(p => p.end_date === targetDate && p.status !== 'completed')
   const startingToday = projects.filter(p => p.start_date === targetDate)
 
-  // Sort by priority
   const priorityOrder = { high: 0, medium: 1, low: 2 }
   const sortFn = (a: typeof projects[0], b: typeof projects[0]) => priorityOrder[a.priority] - priorityOrder[b.priority]
 
+  // ── Todos: today's incomplete ones ──
+  const todayTodos = projectStore.getTodos().filter(t => !t.completed).sort((a, b) => a.sort_order - b.sort_order)
+
+  // ── Milestones: today + next 14 days ──
+  const twoWeeksLater = new Date(target)
+  twoWeeksLater.setDate(twoWeeksLater.getDate() + 14)
+  const futureMilestones = projectStore.getMilestones().filter(m => {
+    const mDate = new Date(m.date + 'T00:00:00')
+    return mDate >= target && mDate <= twoWeeksLater
+  }).sort((a, b) => a.date.localeCompare(b.date))
+
+  // ── Render helpers ──
+  const remaining = getRemainingDays(targetDate)
+  const remainingLabel = remaining === 0 ? '今天' : remaining > 0 ? `剩 ${remaining} 天` : `已過 ${Math.abs(remaining)} 天`
+
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      {/* Back button */}
-      <button
-        onClick={() => navigate('/')}
-        className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        返回總覽
-      </button>
-
-      {/* Date Header */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
-        <div className="flex items-center justify-between mb-2">
-          <button
-            onClick={() => navigate(`/daily/${dateToStr(prevDate)}`)}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+    <div className="flex items-start gap-6">
+      {/* Left column: Todos */}
+      <div className="w-72 flex-shrink-0 space-y-4">
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5 mb-3">
+            <svg className="w-4 h-4 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
             </svg>
-          </button>
-
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">{formatMonthDay(targetDate)}</h1>
-            <p className="text-gray-500">週{dayOfWeek}</p>
-          </div>
-
-          <button
-            onClick={() => navigate(`/daily/${dateToStr(nextDate)}`)}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
+            待辦事項
+            {todayTodos.length > 0 && (
+              <span className="bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full text-xs">
+                {todayTodos.filter(t => !t.completed).length}/{todayTodos.length}
+              </span>
+            )}
+          </h2>
+          {todayTodos.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-4">暫無待辦事項</p>
+          ) : (
+            <div className="space-y-2">
+              {todayTodos.map(todo => (
+                <div
+                  key={todo.id}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
+                    todo.completed ? 'bg-gray-50 border-gray-200 opacity-60' : 'bg-white border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                    todo.priority === 'high' ? 'text-red-600 bg-red-100' :
+                    todo.priority === 'medium' ? 'text-yellow-600 bg-yellow-100' :
+                    'text-gray-500 bg-gray-100'
+                  }`}>
+                    {todo.priority === 'high' ? '高' : todo.priority === 'medium' ? '中' : '低'}
+                  </span>
+                  <span className={`text-sm truncate ${todo.completed ? 'line-through' : ''}`}>
+                    {todo.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Quick date input */}
-        <input
-          type="date"
-          defaultValue={targetDate}
-          onChange={e => navigate(`/daily/${e.target.value}`)}
-          className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-blue-400 mt-2"
-        />
+        {/* Add todo quick action */}
+        <button
+          onClick={() => {
+            navigate('/')
+          }}
+          className="w-full py-3 border-2 border-dashed border-teal-300 rounded-xl text-teal-400 hover:border-teal-500 hover:text-teal-600 transition-colors text-sm"
+        >
+          + 新增待辦事項
+        </button>
       </div>
 
-      {/* Active projects */}
-      {inProgress.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-blue-600 mb-2 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
-            進行中（{inProgress.length}）
-          </h2>
-          <div className="space-y-3">
-            {inProgress.sort(sortFn).map(p => (
-              <ProjectCard
-                key={p.id}
-                project={p}
-                onClick={() => navigate(`/project/${p.id}`)}
-                onDelete={() => {
-                  if (confirm(`確定刪除「${p.name}」？`)) remove(p.id)
-                }}
-              />
-            ))}
+      {/* Right column: Dates + Projects + Milestones */}
+      <div className="flex-1 min-w-0 space-y-6">
+        {/* Date Header */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
+          <div className="flex items-center justify-between mb-2">
+            <button
+              onClick={() => {
+                const prev = new Date(target)
+                prev.setDate(prev.getDate() - 1)
+                navigate(`/daily/${dateToStr(prev)}`)
+              }}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">{formatMonthDay(targetDate)}</h1>
+              <p className="text-gray-500">
+                週{dayOfWeek}
+                {' · '}
+                <span className={`font-medium ${
+                  remaining === 0 ? 'text-orange-500' :
+                  remaining > 0 ? 'text-green-500' :
+                  'text-red-500'
+                }`}>
+                  {remainingLabel}
+                </span>
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                const next = new Date(target)
+                next.setDate(next.getDate() + 1)
+                navigate(`/daily/${dateToStr(next)}`)
+              }}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
           </div>
-        </div>
-      )}
 
-      {/* Preparing */}
-      {preparing.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-yellow-600 mb-2 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block"></span>
-            準備中（{preparing.length}）
-          </h2>
-          <div className="space-y-3">
-            {preparing.sort(sortFn).map(p => (
-              <ProjectCard
-                key={p.id}
-                project={p}
-                onClick={() => navigate(`/project/${p.id}`)}
-                onDelete={() => {
-                  if (confirm(`確定刪除「${p.name}」？`)) remove(p.id)
-                }}
-              />
-            ))}
+          {/* Quick date input */}
+          <input
+            type="date"
+            defaultValue={targetDate}
+            onChange={e => navigate(`/daily/${e.target.value}`)}
+            className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-blue-400 mt-2"
+          />
+        </div>
+
+        {/* Active projects */}
+        {inProgress.length > 0 && (
+          <div>
+            <h2 className="text-sm font-semibold text-blue-600 mb-2 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
+              進行中（{inProgress.length}）
+            </h2>
+            <div className="space-y-3">
+              {inProgress.sort(sortFn).map(p => (
+                <ProjectCard
+                  key={p.id}
+                  project={p}
+                  onClick={() => navigate(`/project/${p.id}`)}
+                  onDelete={() => {
+                    if (confirm(`確定刪除「${p.name}」？`)) remove(p.id)
+                  }}
+                />
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Ending today */}
-      {completingToday.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-orange-500 mb-2 flex items-center gap-1.5">
-            🔥 今天到期（{completingToday.length}）
-          </h2>
-          <div className="space-y-3">
-            {completingToday.sort(sortFn).map(p => (
-              <ProjectCard
-                key={p.id}
-                project={p}
-                onClick={() => navigate(`/project/${p.id}`)}
-                onDelete={() => {
-                  if (confirm(`確定刪除「${p.name}」？`)) remove(p.id)
-                }}
-              />
-            ))}
+        {/* Preparing */}
+        {preparing.length > 0 && (
+          <div>
+            <h2 className="text-sm font-semibold text-yellow-600 mb-2 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block"></span>
+              準備中（{preparing.length}）
+            </h2>
+            <div className="space-y-3">
+              {preparing.sort(sortFn).map(p => (
+                <ProjectCard
+                  key={p.id}
+                  project={p}
+                  onClick={() => navigate(`/project/${p.id}`)}
+                  onDelete={() => {
+                    if (confirm(`確定刪除「${p.name}」？`)) remove(p.id)
+                  }}
+                />
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Starting today */}
-      {startingToday.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-green-600 mb-2 flex items-center gap-1.5">
-            🚀 今天啟動（{startingToday.length}）
-          </h2>
-          <div className="space-y-3">
-            {startingToday.sort(sortFn).map(p => (
-              <ProjectCard
-                key={p.id}
-                project={p}
-                onClick={() => navigate(`/project/${p.id}`)}
-                onDelete={() => {
-                  if (confirm(`確定刪除「${p.name}」？`)) remove(p.id)
-                }}
-              />
-            ))}
+        {/* Ending today */}
+        {completingToday.length > 0 && (
+          <div>
+            <h2 className="text-sm font-semibold text-orange-500 mb-2 flex items-center gap-1.5">
+              🔥 今天到期（{completingToday.length}）
+            </h2>
+            <div className="space-y-3">
+              {completingToday.sort(sortFn).map(p => (
+                <ProjectCard
+                  key={p.id}
+                  project={p}
+                  onClick={() => navigate(`/project/${p.id}`)}
+                  onDelete={() => {
+                    if (confirm(`確定刪除「${p.name}」？`)) remove(p.id)
+                  }}
+                />
+              ))}
+            </div>
           </div>
+        )}
+
+        {/* Starting today */}
+        {startingToday.length > 0 && (
+          <div>
+            <h2 className="text-sm font-semibold text-green-600 mb-2 flex items-center gap-1.5">
+              🚀 今天啟動（{startingToday.length}）
+            </h2>
+            <div className="space-y-3">
+              {startingToday.sort(sortFn).map(p => (
+                <ProjectCard
+                  key={p.id}
+                  project={p}
+                  onClick={() => navigate(`/project/${p.id}`)}
+                  onDelete={() => {
+                    if (confirm(`確定刪除「${p.name}」？`)) remove(p.id)
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Milestones / Activities */}
+        {futureMilestones.length > 0 && (
+          <div className="bg-white rounded-xl border border-purple-200">
+            <h2 className="text-sm font-semibold text-purple-600 px-4 pt-4 flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              近期活動（今日 ~ 兩週）
+            </h2>
+            <div className="space-y-2 px-4 pb-4">
+              {futureMilestones.map(milestone => {
+                const mRemaining = getRemainingDays(milestone.date)
+                const mLabel = mRemaining === 0 ? '今天' : mRemaining > 0 ? `剩 ${mRemaining} 天` : `已過 ${Math.abs(mRemaining)} 天`
+                return (
+                  <div key={milestone.id} className="flex items-center gap-3 py-2 border-b border-gray-100 last:border-b-0">
+                    <div className="text-xs font-mono text-gray-400 w-14 flex-shrink-0">{milestone.date}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-sm font-medium truncate ${
+                        mRemaining < 0 ? 'text-gray-400 line-through' : 'text-gray-800'
+                      }`}>
+                        {milestone.name}
+                      </div>
+                      {milestone.tags && milestone.tags.length > 0 && (
+                        <div className="flex gap-1 mt-0.5">
+                          {milestone.tags.map(tag => (
+                            <span key={tag} className="text-xs text-purple-400 bg-purple-50 px-1.5 rounded">{tag}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
+                      mRemaining < 0 ? 'bg-gray-100 text-gray-400' :
+                      mRemaining <= 3 ? 'bg-red-100 text-red-600' :
+                      'bg-purple-100 text-purple-600'
+                    }`}>
+                      {mLabel}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* No projects + no milestones */}
+        {(inProgress.length === 0 && preparing.length === 0 && completingToday.length === 0 && startingToday.length === 0 && futureMilestones.length === 0) && (
+          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
+            <p className="text-lg mb-2">這天沒有專案活動</p>
+            <p className="text-sm">在甘特圖點擊日期來查看當日專案</p>
+          </div>
+        )}
+
+        {/* Add project / activity buttons */}
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => {
+              add({
+                name: `今天新增的專案`,
+                description: '',
+                parent_id: null,
+                sort_order: 0,
+                start_date: targetDate,
+                end_date: targetDate,
+                status: 'preparation',
+                priority: 'medium',
+                tags: [],
+                progress: 0,
+              })
+              navigate('/')
+            }}
+            className="py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors text-sm"
+          >
+            + 新增今天的專案
+          </button>
+          <button
+            onClick={() => {
+              projectStore.addMilestone({
+                name: `今天新增的活動`,
+                date: targetDate,
+                tags: ['活動'],
+                description: '',
+              })
+              navigate('/')
+            }}
+            className="py-3 border-2 border-dashed border-purple-300 rounded-xl text-gray-400 hover:border-purple-400 hover:text-purple-500 transition-colors text-sm"
+          >
+            + 新增今天的活動
+          </button>
         </div>
-      )}
-
-      {/* No projects */}
-      {(inProgress.length === 0 && preparing.length === 0 && completingToday.length === 0 && startingToday.length === 0) && (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
-          <p className="text-lg mb-2">這天沒有專案活動</p>
-          <p className="text-sm">在甘特圖點擊日期來查看當日專案</p>
-        </div>
-      )}
-
-      {/* Add project button */}
-      <button
-        onClick={() => {
-          add({
-            name: `今天新增的專案`,
-            description: '',
-            parent_id: null,
-            sort_order: 0,
-            start_date: targetDate,
-            end_date: targetDate,
-            status: 'preparation',
-            priority: 'medium',
-            tags: [],
-            progress: 0,
-          })
-          navigate('/')
-        }}
-        className="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors text-sm"
-      >
-        + 新增今天的專案
-      </button>
-
-      {/* Add activity button */}
-      <button
-        onClick={() => {
-          projectStore.addMilestone({
-            name: `今天新增的活動`,
-            date: targetDate,
-            tags: ['活動'],
-            description: '',
-          })
-          navigate('/')
-        }}
-        className="w-full py-3 border-2 border-dashed border-purple-300 rounded-xl text-gray-400 hover:border-purple-400 hover:text-purple-500 transition-colors text-sm"
-      >
-        + 新增今天的活動
-      </button>
+      </div>
     </div>
   )
 }
