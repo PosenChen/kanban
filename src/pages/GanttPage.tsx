@@ -10,7 +10,7 @@ const DAY_WIDTH = 24      // 1 day = 24px
 const FROZEN_COLS = 4     // freeze left 4 date columns = 96px
 const FROZEN_WIDTH = FROZEN_COLS * DAY_WIDTH  // 96px
 const PARENT_ROW_HEIGHT = 24  // parent row height
-const SUB_ROW_HEIGHT = 20      // sub-project row height
+const SUB_ROW_HEIGHT = 18      // sub-project row height (20 - 2)
 const MILESTONE_ROW_HEIGHT = 32
 const SIDEBAR_WIDTH = FROZEN_WIDTH  // 96px
 const SIDEBAR_EXPAND_BTN = 42
