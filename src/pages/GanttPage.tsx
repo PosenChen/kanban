@@ -12,7 +12,7 @@ const FROZEN_WIDTH = FROZEN_COLS * DAY_WIDTH  // 96px
 const PARENT_ROW_HEIGHT = 24  // parent row height
 const SUB_ROW_HEIGHT = 20      // sub-project row height
 const MILESTONE_ROW_HEIGHT = 32
-const SIDEBAR_LABEL_MAX = 82
+const SIDEBAR_WIDTH = FROZEN_WIDTH  // 96px
 const SIDEBAR_EXPAND_BTN = 42
 
 // Parse a YYYY-MM-DD string as a local-date midnight (not UTC)
@@ -37,11 +37,6 @@ interface DayHeader {
   dayNum: number
   isMonthStart: boolean
   dayOfWeek: number
-}
-
-function truncateName(name: string, maxChars: number): string {
-  if (name.length <= maxChars) return name
-  return name.slice(0, maxChars - 1) + '…'
 }
 
 function GanttPage() {
