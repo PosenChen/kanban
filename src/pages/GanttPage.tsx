@@ -430,18 +430,29 @@ function GanttPage() {
     }
   }, [remove])
 
-  // ── Build sidebar rows list (same DOM order as right SVG) ──
+  // ── Build sidebar rows list (same DOM order as right SVG) + isFirstSibling/isLastSibling ──
   const sidebarRows = useMemo(() => {
-    const rows: Array<{ project: Project; isRoot: boolean; groupId: string }> = []
+    const rows: Array<{ project: Project; isRoot: boolean; groupId: string; isFirstSibling: boolean; isLastSibling: boolean }> = []
     for (const group of filteredGroups) {
       const rootProject = projects.find(p => p.id === group.projectId)
       if (!rootProject) continue
       const isExpanded = expandedParents.has(group.projectId)
-      rows.push({ project: rootProject, isRoot: true, groupId: group.projectId })
+      // Root is always first and last among itself
+      rows.push({ project: rootProject, isRoot: true, groupId: group.projectId, isFirstSibling: true, isLastSibling: true })
       if (isExpanded) {
-        for (const s of group.subProjects) {
-          rows.push({ project: s, isRoot: false, groupId: group.projectId })
-        }
+        // Build sibling list for children
+        const allChildren = [rootProject, ...group.subProjects].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+        const total = allChildren.length
+        allChildren.forEach((child, i) => {
+          const isRootOfGroup = child.id === group.projectId
+          rows.push({
+            project: child,
+            isRoot: isRootOfGroup,
+            groupId: group.projectId,
+            isFirstSibling: i === 0,
+            isLastSibling: i === total - 1,
+          })
+        })
       }
     }
     return rows
@@ -694,6 +705,11 @@ function GanttPage() {
                 const sc = group?.subProjects.length ?? 0
                 const exp = expandedParents.has(row.groupId)
                 const bgEven = idx % 2 === 0
+                // For root projects: parentId is null (sort among roots)
+                // For sub-projects: parentId is project.parent_id (sort among children of same parent)
+                const sortParentId = isRoot ? null : project.parent_id
+                const canMoveUp = !row.isFirstSibling
+                const canMoveDown = !row.isLastSibling
 
                 return (
                   <div
@@ -707,28 +723,32 @@ function GanttPage() {
                       className="flex-1 min-w-0 truncate px-1 flex items-center gap-1"
                       title={project.name}
                     >
-                      {/* Move up/down for all rows — placed inside name area */}
+                      {/* Move up/down arrows — only show when applicable */}
                       <div className="flex flex-col gap-0 pointer-events-auto flex-shrink-0">
-                        <span
-                          className="cursor-pointer hover:bg-blue-200 rounded w-[14px] h-[10px] flex items-center justify-center text-[8px] text-gray-300 hover:text-blue-500"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleMoveProjectUp(isRoot ? null : project.parent_id, project.id)
-                          }}
-                          title="上移"
-                        >
-                          ▲
-                        </span>
-                        <span
-                          className="cursor-pointer hover:bg-blue-200 rounded w-[14px] h-[10px] flex items-center justify-center text-[8px] text-gray-300 hover:text-blue-500"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleMoveProjectDown(isRoot ? null : project.parent_id, project.id)
-                          }}
-                          title="下移"
-                        >
-                          ▼
-                        </span>
+                        {canMoveUp && (
+                          <span
+                            className="cursor-pointer hover:bg-blue-200 rounded w-[14px] h-[10px] flex items-center justify-center text-[8px] text-gray-300 hover:text-blue-500"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleMoveProjectUp(sortParentId, project.id)
+                            }}
+                            title="上移"
+                          >
+                            ▲
+                          </span>
+                        )}
+                        {canMoveDown && (
+                          <span
+                            className="cursor-pointer hover:bg-blue-200 rounded w-[14px] h-[10px] flex items-center justify-center text-[8px] text-gray-300 hover:text-blue-500"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleMoveProjectDown(sortParentId, project.id)
+                            }}
+                            title="下移"
+                          >
+                            ▼
+                          </span>
+                        )}
                       </div>
                       <span className={`text-[10px] truncate block leading-none pointer-events-none ${
                         isRoot ? 'font-medium text-gray-800' : 'text-gray-500'

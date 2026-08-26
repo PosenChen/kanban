@@ -20,6 +20,11 @@ export function useProjects() {
     return () => window.removeEventListener('kanban:data-change', handler)
   }, [])
 
+  // Helper: re-read fresh state from store for move operations
+  const refreshProjects = useCallback(() => {
+    setProjects([...projectStore.getAll()])
+  }, [])
+
   return {
     projects,
     add: useCallback(
@@ -49,7 +54,13 @@ export function useProjects() {
     getChildren: useCallback((projectId: string) => projectStore.getChildren(projectId), []),
     getById: useCallback((id: string) => projectStore.getById(id), []),
     getAll: useCallback(() => projectStore.getAll(), []),
-    moveProjectUp: useCallback((parentId: string | null, projectId: string) => projectStore.moveProjectUp(parentId, projectId), []),
-    moveProjectDown: useCallback((parentId: string | null, projectId: string) => projectStore.moveProjectDown(parentId, projectId), []),
+    moveProjectUp: useCallback((parentId: string | null, projectId: string) => {
+      projectStore.moveProjectUp(parentId, projectId)
+      refreshProjects()
+    }, [refreshProjects]),
+    moveProjectDown: useCallback((parentId: string | null, projectId: string) => {
+      projectStore.moveProjectDown(parentId, projectId)
+      refreshProjects()
+    }, [refreshProjects]),
   }
 }
