@@ -649,15 +649,16 @@ function GanttPage() {
                 return (
                   <div
                     key={isRoot ? `root-${project.id}` : `sub-${project.id}`}
-                    className="flex items-center border-b border-gray-100"
+                    className="flex items-center border-b border-gray-100 cursor-pointer hover:bg-blue-50"
                     style={{ height: rowHeight, backgroundColor: bgEven ? '#ffffff' : '#fafafa' }}
+                    onClick={() => handleProjectClick(project.id)}
                   >
                     {/* Project name — CSS text-overflow: ellipsis guarantees no overflow */}
                     <div
                       className="flex-1 min-w-0 truncate px-1"
                       title={project.name}
                     >
-                      <span className={`text-[10px] truncate block leading-none ${
+                      <span className={`text-[10px] truncate block leading-none pointer-events-none ${
                         isRoot ? 'font-medium text-gray-800' : 'text-gray-500'
                       }`}>
                         {isRoot
@@ -667,7 +668,7 @@ function GanttPage() {
                     </div>
 
                     {/* Expand / collapse button — 14×14, no badge */}
-                    <div className="w-[28px] flex-shrink-0 flex items-center justify-center">
+                    <div className="w-[28px] flex-shrink-0 flex items-center justify-center pointer-events-auto">
                       {isRoot && sc > 0 && (
                         <span
                           className="cursor-pointer hover:brightness-110 flex items-center justify-center w-[14px] h-[14px] rounded text-[10px] font-bold transition-colors bg-gray-200 text-gray-500 hover:bg-gray-300"
