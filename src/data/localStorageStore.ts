@@ -381,72 +381,98 @@ export const projectStore = {
   },
 
   // ── Project reordering (sort_order) ──
-  // Move the given project up: swap with the immediately preceding sibling (lower sort_order)
+  // Move the given project up one slot within its sibling group (same parent_id).
+  // This works even if sort_order values are duplicated/missing: we re-sort the
+  // sibling list to the target order, then reassign sequential sort_orders 0..N-1.
   moveProjectUp(parentId: string | null, projectId: string): Project | undefined {
-    const siblings = cached.filter(p => p.parent_id === parentId).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    const siblings = cached.filter(p => p.parent_id === parentId)
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     if (siblings.length <= 1) return undefined
     const idx = siblings.findIndex(p => p.id === projectId)
     if (idx <= 0) return undefined
-    const [current, prev] = [siblings[idx], siblings[idx - 1]]
-    // Swap sort_orders in cached
-    const cIdx = cached.findIndex(p => p.id === current.id)
-    const pIdx = cached.findIndex(p => p.id === prev.id)
-    if (cIdx === -1 || pIdx === -1) return undefined
-    cached[cIdx] = { ...current, sort_order: prev.sort_order, updated_at: new Date().toISOString() }
-    cached[pIdx] = { ...prev, sort_order: current.sort_order, updated_at: new Date().toISOString() }
+    // Swap positions in the sibling list
+    ;[siblings[idx - 1], siblings[idx]] = [siblings[idx], siblings[idx - 1]]
+    // Reassign sequential sort_orders and write back to cached
+    const updated: Project[] = []
+    siblings.forEach((sib, i) => {
+      const sIdx = cached.findIndex(p => p.id === sib.id)
+      if (sIdx !== -1) {
+        const obj = { ...cached[sIdx], sort_order: i, updated_at: new Date().toISOString() }
+        cached[sIdx] = obj
+        updated.push(obj)
+      }
+    })
+    if (updated.length === 0) return undefined
     saveLocal(cached)
     emitProjectChange()
-    return cached[cIdx]
+    return updated[0]
   },
 
-  // Move the given project down: swap with the immediately following sibling (higher sort_order)
+  // Move the given project down one slot within its sibling group.
   moveProjectDown(parentId: string | null, projectId: string): Project | undefined {
-    const siblings = cached.filter(p => p.parent_id === parentId).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    const siblings = cached.filter(p => p.parent_id === parentId)
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     if (siblings.length <= 1) return undefined
     const idx = siblings.findIndex(p => p.id === projectId)
     if (idx >= siblings.length - 1) return undefined
-    const [current, next] = [siblings[idx], siblings[idx + 1]]
-    // Swap sort_orders in cached
-    const cIdx = cached.findIndex(p => p.id === current.id)
-    const nIdx = cached.findIndex(p => p.id === next.id)
-    if (cIdx === -1 || nIdx === -1) return undefined
-    cached[cIdx] = { ...current, sort_order: next.sort_order, updated_at: new Date().toISOString() }
-    cached[nIdx] = { ...next, sort_order: current.sort_order, updated_at: new Date().toISOString() }
+    // Swap positions in the sibling list
+    ;[siblings[idx], siblings[idx + 1]] = [siblings[idx + 1], siblings[idx]]
+    // Reassign sequential sort_orders and write back to cached
+    const updated: Project[] = []
+    siblings.forEach((sib, i) => {
+      const sIdx = cached.findIndex(p => p.id === sib.id)
+      if (sIdx !== -1) {
+        const obj = { ...cached[sIdx], sort_order: i, updated_at: new Date().toISOString() }
+        cached[sIdx] = obj
+        updated.push(obj)
+      }
+    })
+    if (updated.length === 0) return undefined
     saveLocal(cached)
     emitProjectChange()
-    return cached[cIdx]
+    return updated[0]
   },
 
+  // Move a todo up one slot. Reorders the array and reassigns sequential sort_orders.
   moveTodoUp(todoId: string): Todo | undefined {
     const sorted = [...todos].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     if (sorted.length <= 1) return undefined
     const idx = sorted.findIndex(t => t.id === todoId)
     if (idx <= 0) return undefined
-    const [current, prev] = [sorted[idx], sorted[idx - 1]]
-    const tIdx = todos.findIndex(t => t.id === prev.id)
-    const cIdx = todos.findIndex(t => t.id === current.id)
-    if (tIdx === -1 || cIdx === -1) return undefined
-    todos[tIdx] = { ...prev, sort_order: current.sort_order, updated_at: new Date().toISOString() }
-    todos[cIdx] = { ...current, sort_order: prev.sort_order, updated_at: new Date().toISOString() }
+    // Swap positions
+    ;[sorted[idx - 1], sorted[idx]] = [sorted[idx], sorted[idx - 1]]
+    // Reassign sequential sort_orders
+    const updated: Todo[] = sorted.map((t, i) => {
+      const tIdx = todos.findIndex(x => x.id === t.id)
+      if (tIdx === -1) return t
+      const obj = { ...t, sort_order: i, updated_at: new Date().toISOString() }
+      todos[tIdx] = obj
+      return obj
+    })
     saveTodos(todos)
     emitTodoChange()
-    return todos[cIdx]
+    return updated[idx]
   },
 
+  // Move a todo down one slot. Reorders the array and reassigns sequential sort_orders.
   moveTodoDown(todoId: string): Todo | undefined {
     const sorted = [...todos].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     if (sorted.length <= 1) return undefined
     const idx = sorted.findIndex(t => t.id === todoId)
     if (idx >= sorted.length - 1) return undefined
-    const [current, next] = [sorted[idx], sorted[idx + 1]]
-    const nIdx = todos.findIndex(t => t.id === next.id)
-    const cIdx = todos.findIndex(t => t.id === current.id)
-    if (nIdx === -1 || cIdx === -1) return undefined
-    todos[nIdx] = { ...next, sort_order: current.sort_order, updated_at: new Date().toISOString() }
-    todos[cIdx] = { ...current, sort_order: next.sort_order, updated_at: new Date().toISOString() }
+    // Swap positions
+    ;[sorted[idx], sorted[idx + 1]] = [sorted[idx + 1], sorted[idx]]
+    // Reassign sequential sort_orders
+    const updated: Todo[] = sorted.map((t, i) => {
+      const tIdx = todos.findIndex(x => x.id === t.id)
+      if (tIdx === -1) return t
+      const obj = { ...t, sort_order: i, updated_at: new Date().toISOString() }
+      todos[tIdx] = obj
+      return obj
+    })
     saveTodos(todos)
     emitTodoChange()
-    return todos[cIdx]
+    return updated[idx]
   },
 
   getRootProjects(): Project[] {
