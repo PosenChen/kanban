@@ -357,6 +357,7 @@ function GanttPage() {
   }, [navigate])
 
   const handleProjectClick = useCallback((id: string) => {
+    console.log('[GanttPage] handleProjectClick called with id:', id)
     navigate(`/project/${id}`)
   }, [navigate])
 
