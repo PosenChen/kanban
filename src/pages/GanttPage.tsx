@@ -652,23 +652,14 @@ function GanttPage() {
                       </span>
                     </div>
 
-                    {/* Expand / collapse button */}
-                    <div className="w-[42px] flex-shrink-0 flex items-center justify-center">
+                    {/* Expand / collapse button — 14×14, no badge */}
+                    <div className="w-[28px] flex-shrink-0 flex items-center justify-center">
                       {isRoot && sc > 0 && (
                         <span
-                          className="cursor-pointer hover:brightness-110 flex items-center gap-0.5"
+                          className="cursor-pointer hover:brightness-110 flex items-center justify-center w-[14px] h-[14px] rounded text-[10px] font-bold transition-colors bg-gray-200 text-gray-500 hover:bg-gray-300"
                           onClick={(e) => { e.stopPropagation(); toggleExpand(project.id) }}
                         >
-                          <span className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold transition-colors ${
-                            exp ? 'bg-blue-100 text-blue-600' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
-                          }`}>
-                            {exp ? '▼' : '▶'}
-                          </span>
-                          <span className={`text-[8px] rounded-full px-1 font-bold ${
-                            exp ? 'bg-blue-600 text-white' : 'bg-gray-500 text-white'
-                          }`}>
-                            {sc}
-                          </span>
+                          {exp ? '▼' : '▶'}
                         </span>
                       )}
                     </div>
