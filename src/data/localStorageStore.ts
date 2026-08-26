@@ -183,41 +183,65 @@ cached.forEach(p => {
 // Clean up any remaining milestone-status projects (second pass)
 cached = cached.filter(p => (p as any).status !== 'milestone')
 
-// ── Migration: add sort_order to projects missing it ──
-// Group by parent_id and assign sequential sort_order
-const groupsByParent = new Map<string | null, Project[]>()
+// ── Migration: ensure sort_order is sequential per sibling group ──
+// Group by parent_id and assign sequential sort_order 0..N-1 so there are
+// no missing or DUPLICATE values (duplicates break reorder swaps).
+
+// Helper: rebuild sequential sort_order for a list of items, only writing
+// back when the current values are non-sequential (missing/null/duplicate).
+function resequence<T extends { id: string; sort_order?: number | null; updated_at: string }>(
+  items: T[],
+  write: (list: T[]) => void,
+): T[] {
+  const sorted = [...items].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+  // Check if current sequence is already a strict 0..N-1
+  let clean = true
+  for (let i = 0; i < sorted.length; i++) {
+    if (sorted[i].sort_order !== i) { clean = false; break }
+  }
+  if (clean) return items
+  const updated: T[] = sorted.map((it, i) => ({
+    ...it,
+    sort_order: i,
+    updated_at: new Date().toISOString(),
+  }))
+  write(updated)
+  return updated
+}
+
+// Re-sequence projects per sibling group (parent_id)
+const projectsByParent = new Map<string | null, Project[]>()
 cached.forEach(p => {
   const key = p.parent_id ?? '__ROOT__'
-  const arr = groupsByParent.get(key) || []
+  const arr = projectsByParent.get(key) || []
   arr.push(p)
-  groupsByParent.set(key, arr)
+  projectsByParent.set(key, arr)
 })
-groupsByParent.forEach((arr, key) => {
-  arr.sort((a, b) => ((a as any).sort_order ?? 0) - ((b as any).sort_order ?? 0))
-  arr.forEach((p, i) => {
-    const idx = cached.findIndex(c => c.id === p.id)
-    if (idx !== -1) {
-      const existing = cached[idx]
-      const existingOrder = (existing as any).sort_order
-      // Only add sort_order if it's missing (undefined), not if it's 0
-      if (existingOrder === undefined || existingOrder === null) {
-        cached[idx] = { ...existing, sort_order: i, updated_at: new Date().toISOString() }
-      }
+projectsByParent.forEach((arr, key) => {
+  const fixed = resequence(arr, (list) => {
+    cached = [...cached]
+    for (const item of list) {
+      const idx = cached.findIndex(c => c.id === item.id)
+      if (idx !== -1) cached[idx] = item as unknown as Project
     }
+    saveLocal(cached)
   })
-})
-
-// ── Migration: add sort_order to todos missing it ──
-todos.forEach((t, i) => {
-  const idx = todos.findIndex(x => x.id === t.id)
-  if (idx !== -1) {
-    const existing = todos[idx]
-    const existingOrder = (existing as any).sort_order
-    if (existingOrder === undefined || existingOrder === null) {
-      todos[idx] = { ...existing, sort_order: i, updated_at: new Date().toISOString() }
-    }
+  // push back into cached by reference
+  for (const item of fixed) {
+    const idx = cached.findIndex(c => c.id === item.id)
+    if (idx !== -1) cached[idx] = item as unknown as Project
   }
 })
+
+// Re-sequence todos globally (todos have no parent)
+{
+  const fixed = resequence(todos, (list) => {
+    todos = [...list]
+    saveTodos(todos)
+  })
+  todos = [...fixed]
+  saveTodos(todos)
+}
 
 saveLocal(cached)
 saveTodos(todos)
