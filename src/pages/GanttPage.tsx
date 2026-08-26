@@ -704,9 +704,32 @@ function GanttPage() {
                   >
                     {/* Project name — CSS text-overflow: ellipsis guarantees no overflow */}
                     <div
-                      className="flex-1 min-w-0 truncate px-1"
+                      className="flex-1 min-w-0 truncate px-1 flex items-center gap-1"
                       title={project.name}
                     >
+                      {/* Move up/down for all rows — placed inside name area */}
+                      <div className="flex flex-col gap-0 pointer-events-auto flex-shrink-0">
+                        <span
+                          className="cursor-pointer hover:bg-blue-200 rounded w-[12px] h-[8px] flex items-center justify-center text-[6px] text-gray-300 hover:text-blue-500"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleMoveProjectUp(isRoot ? null : project.parent_id)
+                          }}
+                          title="上移"
+                        >
+                          ▲
+                        </span>
+                        <span
+                          className="cursor-pointer hover:bg-blue-200 rounded w-[12px] h-[8px] flex items-center justify-center text-[6px] text-gray-300 hover:text-blue-500"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleMoveProjectDown(isRoot ? null : project.parent_id)
+                          }}
+                          title="下移"
+                        >
+                          ▼
+                        </span>
+                      </div>
                       <span className={`text-[10px] truncate block leading-none pointer-events-none ${
                         isRoot ? 'font-medium text-gray-800' : 'text-gray-500'
                       }`}>
@@ -716,33 +739,13 @@ function GanttPage() {
                       </span>
                     </div>
 
-                    {/* Reorder / expand buttons */}
-                    <div className="w-[44px] flex-shrink-0 flex flex-col items-center justify-center gap-0.5 pointer-events-auto">
-                      {/* Move up arrow */}
-                      <span
-                        className="cursor-pointer hover:bg-blue-200 rounded w-[14px] h-[10px] flex items-center justify-center text-[7px] text-gray-400 hover:text-blue-600"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleMoveProjectUp(isRoot ? null : project.parent_id)
-                        }}
-                      >
-                        ▲
-                      </span>
-                      {/* Move down arrow */}
-                      <span
-                        className="cursor-pointer hover:bg-blue-200 rounded w-[14px] h-[10px] flex items-center justify-center text-[7px] text-gray-400 hover:text-blue-600"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleMoveProjectDown(isRoot ? null : project.parent_id)
-                        }}
-                      >
-                        ▼
-                      </span>
-                      {/* Expand / collapse for roots */}
+                    {/* Expand / collapse button for roots only — rightmost */}
+                    <div className="w-[22px] flex-shrink-0 flex items-center justify-center pointer-events-auto">
                       {isRoot && sc > 0 && (
                         <span
-                          className="cursor-pointer hover:bg-blue-200 rounded w-[14px] h-[10px] flex items-center justify-center text-[9px] font-bold transition-colors bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-blue-600"
+                          className="cursor-pointer hover:bg-blue-200 rounded w-[14px] h-[14px] flex items-center justify-center text-[10px] font-bold transition-colors bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-blue-600"
                           onClick={(e) => { e.stopPropagation(); toggleExpand(project.id) }}
+                          title={exp ? '收起' : '展開'}
                         >
                           {exp ? '▼' : '▶'}
                         </span>
