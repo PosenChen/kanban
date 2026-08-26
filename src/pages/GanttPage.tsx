@@ -14,6 +14,7 @@ const SUB_ROW_HEIGHT = 20      // sub-project row height
 const MILESTONE_ROW_HEIGHT = 32
 const SIDEBAR_WIDTH = FROZEN_WIDTH  // 96px
 const SIDEBAR_EXPAND_BTN = 42
+const HEADER_HEIGHT = 28
 
 // Parse a YYYY-MM-DD string as a local-date midnight (not UTC)
 function localDate(str: string): Date {
@@ -407,7 +408,7 @@ function GanttPage() {
   // Build SVG rows with y-offsets
   const svgRows = useMemo(() => {
     const rows: Array<{ project: Project; isRoot: boolean; y: number; h: number }> = []
-    let y = headerHeight + MILESTONE_ROW_HEIGHT
+    let y = HEADER_HEIGHT + MILESTONE_ROW_HEIGHT
     for (const group of filteredGroups) {
       const rootProject = projects.find(p => p.id === group.projectId)
       if (!rootProject) continue
@@ -423,14 +424,6 @@ function GanttPage() {
     }
     return rows
   }, [filteredGroups, projects, expandedParents])
-
-  // Compute cumulative offset for a given row index in svgRows
-  const rowYAt = useCallback((idx: number) => {
-    if (idx === 0) return headerHeight + MILESTONE_ROW_HEIGHT
-    return svgRows[idx - 1].y + svgRows[idx - 1].h
-  }, [svgRows])
-
-  const headerHeight = 28
 
   // ── Gantt bar render helper ──
   const renderBar = (project: Project) => {
@@ -593,16 +586,16 @@ function GanttPage() {
         </div>
 
         {/* Main gantt area: frozen sidebar (HTML) + scrollable right (SVG) */}
-        <div className="relative" style={{ height: totalGanttHeight + headerHeight }}>
+        <div className="relative" style={{ height: totalGanttHeight + HEADER_HEIGHT }}>
           {/* ══════════ FROZEN LEFT SIDEBAR (HTML, never scrolls) ══════════ */}
           <div
             className="absolute left-0 top-0 bg-white overflow-hidden z-10"
-            style={{ width: SIDEBAR_WIDTH, height: totalGanttHeight + headerHeight, borderRight: '1px solid #e5e7eb' }}
+            style={{ width: SIDEBAR_WIDTH, height: totalGanttHeight + HEADER_HEIGHT, borderRight: '1px solid #e5e7eb' }}
           >
             {/* Date header row — no month/day numbers, just a thin strip */}
             <div
               className="flex items-center border-b border-gray-200"
-              style={{ height: headerHeight }}
+              style={{ height: HEADER_HEIGHT }}
             >
               <div className="flex-1 flex items-center px-1">
                 <span className="text-[8px] text-gray-400 font-medium truncate">專案名稱</span>
@@ -680,11 +673,11 @@ function GanttPage() {
           <div className="absolute left-[96px] top-0 right-0 overflow-x-auto overflow-y-hidden">
             <svg
               width={totalWidth}
-              height={totalGanttHeight + headerHeight}
+              height={totalGanttHeight + HEADER_HEIGHT}
               className="min-w-full"
             >
               {/* Date header background */}
-              <rect x={0} y={0} width={totalWidth} height={headerHeight} fill="#f9fafb" />
+              <rect x={0} y={0} width={totalWidth} height={HEADER_HEIGHT} fill="#f9fafb" />
 
               {/* Date columns */}
               {dateHeaders.map((h, i) => {
@@ -693,14 +686,14 @@ function GanttPage() {
                 const bgColor = isWeekend ? '#f3f4f6' : '#fff'
                 return (
                   <g key={`col-${i}`}>
-                    <rect x={xPos} y={0} width={DAY_WIDTH} height={headerHeight} fill={bgColor} />
+                    <rect x={xPos} y={0} width={DAY_WIDTH} height={HEADER_HEIGHT} fill={bgColor} />
                     <line
-                      x1={xPos} y1={0} x2={xPos} y2={headerHeight}
+                      x1={xPos} y1={0} x2={xPos} y2={HEADER_HEIGHT}
                       stroke={h.isMonthStart ? '#d1d5db' : '#e5e7eb'}
                       strokeWidth={h.isMonthStart ? 1.5 : 0.5}
                     />
                     <rect
-                      x={xPos} y={0} width={DAY_WIDTH} height={headerHeight}
+                      x={xPos} y={0} width={DAY_WIDTH} height={HEADER_HEIGHT}
                       fill="transparent"
                       onClick={() => handleDateClick(h.dateStr)}
                       className="cursor-pointer"
@@ -711,20 +704,20 @@ function GanttPage() {
 
               {/* Today highlight */}
               <line
-                x1={todayOffset} y1={headerHeight}
-                x2={todayOffset} y2={totalGanttHeight + headerHeight}
+                x1={todayOffset} y1={HEADER_HEIGHT}
+                x2={todayOffset} y2={totalGanttHeight + HEADER_HEIGHT}
                 stroke="#ef4444" strokeWidth={2.5}
               />
               <rect
                 x={todayOffset} y={0}
-                width={DAY_WIDTH} height={totalGanttHeight + headerHeight}
+                width={DAY_WIDTH} height={totalGanttHeight + HEADER_HEIGHT}
                 fill="#fef2f2" opacity={0.6}
                 pointerEvents="none"
               />
 
               {/* Milestone row */}
               <rect
-                x={0} y={headerHeight}
+                x={0} y={HEADER_HEIGHT}
                 width={totalWidth} height={MILESTONE_ROW_HEIGHT}
                 fill="#faf5ff"
               />
@@ -736,16 +729,16 @@ function GanttPage() {
                 return (
                   <g key={`me-${m.id}`}>
                     <rect
-                      x={mX} y={headerHeight + 6}
+                      x={mX} y={HEADER_HEIGHT + 6}
                       width={20} height={16} rx={4} fill="#A855F7" opacity={0.9}
                     />
                     <polygon
-                      points={`${mX + 20},${headerHeight + 14} ${mX + 20},${headerHeight + 18} ${colRight},${headerHeight + 16}`}
+                      points={`${mX + 20},${HEADER_HEIGHT + 14} ${mX + 20},${HEADER_HEIGHT + 18} ${colRight},${HEADER_HEIGHT + 16}`}
                       fill="#A855F7" opacity={0.9}
                     />
                     <text
                       x={colRight + 4}
-                      y={headerHeight + 18}
+                      y={HEADER_HEIGHT + 18}
                       className="fill-gray-700 cursor-pointer hover:underline"
                       fontSize="9"
                       onClick={() => openEditActivity(m)}
