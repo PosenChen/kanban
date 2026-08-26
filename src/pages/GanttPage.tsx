@@ -65,6 +65,25 @@ function GanttPage() {
   const [priorityFilter, setPriorityFilter] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set())
+  const [justCopiedParentId, setJustCopiedParentId] = useState<string | null>(null)
+
+  // Auto-expand newly copied parent so children are visible
+  useEffect(() => {
+    if (justCopiedParentId) {
+      setExpandedParents(prev => new Set([...prev, justCopiedParentId]))
+      setJustCopiedParentId(null)
+    }
+  }, [justCopiedParentId])
+
+  // Listen for copy event from ProjectDetailPage
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const parentId = (e as CustomEvent).detail as string
+      setJustCopiedParentId(parentId)
+    }
+    window.addEventListener('kanban:project-copied', handler)
+    return () => window.removeEventListener('kanban:project-copied', handler)
+  }, [])
 
   const toggleExpand = useCallback((parentId: string) => {
     setExpandedParents(prev => {
@@ -357,7 +376,6 @@ function GanttPage() {
   }, [navigate])
 
   const handleProjectClick = useCallback((id: string) => {
-    console.log('[GanttPage] handleProjectClick called with id:', id)
     navigate(`/project/${id}`)
   }, [navigate])
 

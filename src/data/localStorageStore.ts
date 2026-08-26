@@ -174,6 +174,10 @@ function emitProjectChange() {
   window.dispatchEvent(new CustomEvent('kanban:data-change', { detail: cached }))
 }
 
+function emitProjectCopied(projectId: string) {
+  window.dispatchEvent(new CustomEvent('kanban:project-copied', { detail: projectId }))
+}
+
 function emitMilestoneChange() {
   window.dispatchEvent(new CustomEvent('kanban:milestone-change', { detail: milestones }))
 }
@@ -311,6 +315,7 @@ export const projectStore = {
 
     saveLocal(cached)
     emitProjectChange()
+    emitProjectCopied(newProject.id)
     return { project: newProject, childCount }
   },
 
