@@ -59,6 +59,19 @@ export function saveLocal(projects: Project[]): void {
   localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(projects))
 }
 
+// Debug: log loaded data in production
+try {
+  const raw = localStorage.getItem(STORAGE_KEY_DATA)
+  if (raw) {
+    const data = JSON.parse(raw)
+    if (Array.isArray(data)) {
+      const count = data.length
+      const statuses = data.map((p: any) => p.status).filter(Boolean)
+      console.log(`[localStorageStore] Loaded ${count} projects. Statuses: preparation=${statuses.filter(s => s === 'preparation').length}, in_progress=${statuses.filter(s => s === 'in_progress').length}, completed=${statuses.filter(s => s === 'completed').length}, waiting=${statuses.filter(s => s === 'waiting').length}`)
+    }
+  }
+} catch {}
+
 // ── GitHub API ──
 
 async function readGitHubFile(token: string, filePath: string): Promise<unknown[]> {
@@ -185,7 +198,9 @@ groupsByParent.forEach((arr, key) => {
     const idx = cached.findIndex(c => c.id === p.id)
     if (idx !== -1) {
       const existing = cached[idx]
-      if (!existing.sort_order && existing.sort_order !== 0) {
+      const existingOrder = (existing as any).sort_order
+      // Only add sort_order if it's missing (undefined), not if it's 0
+      if (existingOrder === undefined || existingOrder === null) {
         cached[idx] = { ...existing, sort_order: i, updated_at: new Date().toISOString() }
       }
     }
@@ -197,7 +212,8 @@ todos.forEach((t, i) => {
   const idx = todos.findIndex(x => x.id === t.id)
   if (idx !== -1) {
     const existing = todos[idx]
-    if (!existing.sort_order && existing.sort_order !== 0) {
+    const existingOrder = (existing as any).sort_order
+    if (existingOrder === undefined || existingOrder === null) {
       todos[idx] = { ...existing, sort_order: i, updated_at: new Date().toISOString() }
     }
   }
