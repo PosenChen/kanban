@@ -550,8 +550,11 @@ export const projectStore = {
           })
           saveMilestones(milestones)
         } else {
-          // Remove milestone status if present (migration)
-          const proj: Project = { ...p, status: 'preparation' as any }
+          const proj: Project = { ...p }
+          // Remove 'milestone' status if present (legacy migration) — keep original status
+          if ((proj as any).status === 'milestone') {
+            proj.status = 'preparation' as any
+          }
           newProjects.push(proj)
         }
       }
