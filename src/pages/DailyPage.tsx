@@ -113,7 +113,7 @@ function DailyPage() {
       </div>
 
       {/* Three-column layout: Todos | Projects | Milestones */}
-      <div className="flex flex-col md:flex md:gap-4 md:items-start">
+      <div className="flex flex-col md:flex-row md:gap-4 md:items-start">
         {/* ── Left column: Todos ── */}
         <div className="md:w-64 flex-shrink-0 space-y-4">
           <div className="bg-white rounded-xl border border-gray-200 p-4">
