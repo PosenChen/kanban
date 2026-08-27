@@ -46,7 +46,7 @@ function DailyPage() {
   const remainingLabel = remaining === 0 ? '今天' : remaining > 0 ? `剩 ${remaining} 天` : `已過 ${Math.abs(remaining)} 天`
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 md:flex md:gap-4 md:items-start">
       {/* Date Header — spans full width */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
         <div className="flex items-center justify-between mb-2">
@@ -102,9 +102,9 @@ function DailyPage() {
       </div>
 
       {/* Three-column layout: Todos | Projects | Milestones */}
-      <div className="flex gap-4 items-start">
-        {/* ── Left column: Todos (narrow) ── */}
-        <div className="w-64 flex-shrink-0 space-y-4">
+      <div className="flex flex-col gap-4 md:flex md:gap-4 md:items-start">
+        {/* ── Left column: Todos ── */}
+        <div className="md:w-64 flex-shrink-0 space-y-4">
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5 mb-3">
               <svg className="w-4 h-4 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -249,8 +249,8 @@ function DailyPage() {
           )}
         </div>
 
-        {/* ── Right column: Milestones / Activities (narrow) ── */}
-        <div className="w-64 flex-shrink-0">
+        {/* ── Right column: Milestones / Activities ── */}
+        <div className="md:w-64 flex-shrink-0">
           {futureMilestones.length > 0 ? (
             <div className="bg-white rounded-xl border border-purple-200">
               <h2 className="text-sm font-semibold text-purple-600 px-4 pt-4 flex items-center gap-1.5">
@@ -333,7 +333,7 @@ function DailyPage() {
           })
           navigate('/')
         }}
-        className="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors text-sm"
+        className="w-full md:max-w-md self-center py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors text-sm"
       >
         + 新增今天的專案
       </button>
