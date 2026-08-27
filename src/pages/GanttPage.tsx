@@ -39,6 +39,7 @@ interface DayHeader {
   month: number
   isMonthStart: boolean
   dayOfWeek: number
+  isToday: boolean
 }
 
 function GanttPage() {
@@ -326,6 +327,7 @@ function GanttPage() {
 
     const headers: DayHeader[] = []
     const d = new Date(startDate)
+    const today = dateToStr(new Date())
 
     while (d <= endDate) {
       headers.push({
@@ -334,6 +336,7 @@ function GanttPage() {
         month: d.getMonth() + 1,
         isMonthStart: d.getDate() === 1,
         dayOfWeek: d.getDay(),
+        isToday: dateToStr(d) === today,
       })
       d.setDate(d.getDate() + 1)
     }
@@ -821,12 +824,12 @@ function GanttPage() {
                       stroke={h.isMonthStart ? '#d1d5db' : '#e5e7eb'}
                       strokeWidth={h.isMonthStart ? 1.5 : 0.5}
                     />
-                    {/* Day number centered in column */}
+                    {/* Day number centered in column — red for today */}
                     <text
                       x={xPos + DAY_WIDTH / 2}
                       y={16}
                       textAnchor="middle"
-                      className="fill-gray-600"
+                      className={h.isToday ? 'fill-red-600 font-bold' : 'fill-gray-600'}
                       fontSize="8"
                     >
                       {h.dayNum}
@@ -853,34 +856,6 @@ function GanttPage() {
                   </g>
                 )
               })}
-
-              {/* Today highlight */}
-              <line
-                x1={todayOffset} y1={HEADER_HEIGHT}
-                x2={todayOffset} y2={totalGanttHeight + HEADER_HEIGHT}
-                stroke="#ef4444" strokeWidth={2.5}
-              />
-              <rect
-                x={todayOffset} y={0}
-                width={DAY_WIDTH} height={totalGanttHeight + HEADER_HEIGHT}
-                fill="#fef2f2" opacity={0.6}
-                pointerEvents="none"
-              />
-              <rect
-                x={todayOffset + 2} y={HEADER_HEIGHT - 2}
-                width={DAY_WIDTH - 4} height={16} rx={4} fill="#ef4444"
-                pointerEvents="none"
-              />
-              <text
-                x={todayOffset + DAY_WIDTH / 2}
-                y={HEADER_HEIGHT + 10}
-                textAnchor="middle"
-                className="fill-white font-bold"
-                fontSize="8"
-                pointerEvents="none"
-              >
-                Today
-              </text>
 
               {/* Milestone row */}
               <rect
@@ -935,6 +910,15 @@ function GanttPage() {
                   </g>
                 )
               })}
+
+              {/* Today red vertical line — renders on top of all bars */}
+              <line
+                x1={todayOffset} y1={HEADER_HEIGHT}
+                x2={todayOffset} y2={totalGanttHeight + HEADER_HEIGHT}
+                stroke="#ef4444" strokeWidth={2}
+                pointerEvents="none"
+              />
+
             </svg>
           </div>
         </div>
