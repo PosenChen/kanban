@@ -5,7 +5,8 @@ export type ProjectPriority = 'high' | 'medium' | 'low'
 export interface Milestone {
   id: string
   name: string
-  date: string // YYYY-MM-DD
+  start_date: string // YYYY-MM-DD — when activity starts
+  end_date: string   // YYYY-MM-DD — when activity ends (defaults to start_date if same)
   tags: string[]
   description?: string
   created_at: string

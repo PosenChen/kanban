@@ -37,9 +37,10 @@ function DailyPage() {
   const twoWeeksLater = new Date(target)
   twoWeeksLater.setDate(twoWeeksLater.getDate() + 14)
   const futureMilestones = projectStore.getMilestones().filter(m => {
-    const mDate = new Date(m.date + 'T00:00:00')
-    return mDate >= target && mDate <= twoWeeksLater
-  }).sort((a, b) => a.date.localeCompare(b.date))
+    const start = new Date(m.start_date + 'T00:00:00')
+    const end = new Date(m.end_date + 'T00:00:00')
+    return end >= target && start <= twoWeeksLater
+  }).sort((a, b) => a.start_date.localeCompare(b.start_date))
 
   // ── Render helpers ──
   const remaining = getRemainingDays(targetDate)
@@ -272,11 +273,18 @@ function DailyPage() {
               </h2>
               <div className="space-y-2 px-4 pb-4">
                 {futureMilestones.map(milestone => {
-                  const mRemaining = getRemainingDays(milestone.date)
+                  const mStart = new Date(milestone.start_date)
+                  const mEnd = new Date(milestone.end_date || milestone.start_date)
+                  const isMultiDay = milestone.start_date !== milestone.end_date
+                  const dateDisplay = isMultiDay
+                    ? `${milestone.start_date.slice(5)}~${milestone.end_date.slice(5)}`
+                    : milestone.start_date.slice(5)
+                  const rangeEnd = milestone.end_date || milestone.start_date
+                  const mRemaining = getRemainingDays(rangeEnd)
                   const mLabel = mRemaining === 0 ? '今天' : mRemaining > 0 ? `剩 ${mRemaining} 天` : `已過 ${Math.abs(mRemaining)} 天`
                   return (
                     <div key={milestone.id} className="flex items-start gap-2 py-2 border-b border-gray-100 last:border-b-0">
-                      <div className="text-xs font-mono text-gray-400 w-11 flex-shrink-0 mt-0.5">{milestone.date.slice(5)}</div>
+                      <div className="text-xs font-mono text-gray-400 w-11 flex-shrink-0 mt-0.5">{dateDisplay}</div>
                       <div className="flex-1 min-w-0">
                         <div className={`text-xs font-medium ${
                           mRemaining < 0 ? 'text-gray-400 line-through' : 'text-gray-800'
@@ -314,7 +322,8 @@ function DailyPage() {
             onClick={() => {
               projectStore.addMilestone({
                 name: `今天新增的活動`,
-                date: targetDate,
+                start_date: targetDate,
+                end_date: targetDate,
                 tags: ['活動'],
                 description: '',
               })

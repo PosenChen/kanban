@@ -1,5 +1,6 @@
 import type { Project, Milestone, Todo } from '@/types/project'
 import { SAMPLE_PROJECTS_WITH_META } from './sampleData'
+import { dateToStr, formatDate } from '@/utils/dateUtils'
 
 const STORAGE_KEY_DATA = 'kanban_projects'
 const STORAGE_KEY_MILESTONES = 'kanban_milestones'
@@ -153,6 +154,39 @@ let todos: Todo[] = []
 
 // Load milestones
 milestones = loadMilestones()
+// Migrate old milestones: convert 'date' to 'start_date'/'end_date', merge adjacent same-name ones
+const migratedMilestones: Milestone[] = milestones.map(m => {
+  const old = m as any
+  const startDate = old.start_date || old.date || dateToStr(new Date())
+  const endDate = old.end_date || startDate
+  return { ...m, start_date: startDate, end_date: endDate }
+})
+// Merge consecutive same-name milestones
+migratedMilestones.sort((a, b) => a.name.localeCompare(b.name) || a.start_date.localeCompare(b.start_date))
+const merged: Milestone[] = []
+for (let i = 0; i < migratedMilestones.length; i++) {
+  const cur = { ...migratedMilestones[i] }
+  while (i + 1 < migratedMilestones.length) {
+    const next = migratedMilestones[i + 1]
+    if (cur.name !== next.name) break
+    const curEnd = new Date(cur.end_date)
+    const nextStart = new Date(next.start_date)
+    const diffDays = Math.round((nextStart.getTime() - curEnd.getTime()) / (1000 * 60 * 60 * 24))
+    if (diffDays <= 1) {
+      cur.end_date = next.end_date
+      cur.tags = [...new Set([...cur.tags, ...next.tags])]
+      if (next.description && !cur.description?.includes(next.description)) {
+        cur.description = cur.description ? `${cur.description}; ${next.description}` : next.description
+      }
+      cur.updated_at = new Date().toISOString()
+      milestones = milestones.filter(m => m.id !== next.id)
+      i++
+    } else break
+  }
+  merged.push(cur)
+}
+milestones = merged
+saveMilestones(milestones)
 // Load todos
 todos = loadTodos()
 
@@ -170,7 +204,8 @@ cached.forEach(p => {
     milestones.push({
       id: p.id,
       name: p.name,
-      date: p.start_date,
+      start_date: p.start_date,
+      end_date: p.start_date,
       tags: p.tags,
       created_at: p.created_at,
       updated_at: p.updated_at,
@@ -507,8 +542,12 @@ export const projectStore = {
 
   addMilestone(data: Omit<Milestone, 'id' | 'created_at' | 'updated_at'>): Milestone {
     const now = new Date().toISOString()
+    const start = data.start_date || dateToStr(new Date())
+    const end = data.end_date || start
     const newMilestone: Milestone = {
       ...data,
+      start_date: start,
+      end_date: end,
       id: `m${Date.now().toString(36)}`,
       created_at: now,
       updated_at: now,
@@ -531,6 +570,10 @@ export const projectStore = {
     const idx = milestones.findIndex(m => m.id === id)
     if (idx === -1) return undefined
     const updated = { ...milestones[idx], ...updates, updated_at: new Date().toISOString() }
+    // Default end_date to start_date if not provided
+    if (!updates.end_date && updates.start_date) {
+      updated.end_date = updates.start_date
+    }
     milestones[idx] = updated
     saveMilestones(milestones)
     emitMilestoneChange()
@@ -600,7 +643,8 @@ export const projectStore = {
           milestones.push({
             id: p.id,
             name: p.name,
-            date: p.start_date,
+            start_date: p.start_date,
+            end_date: p.start_date,
             tags: p.tags,
             created_at: p.created_at,
             updated_at: p.updated_at,

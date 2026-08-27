@@ -54,7 +54,7 @@ function GanttPage() {
   // Update viewStart when projects/milestones load
   useEffect(() => {
     const allDates = projects.map(p => p.start_date)
-    const milestoneDates = milestones.map(m => m.date)
+    const milestoneDates = milestones.map(m => m.start_date)
     const all = [...allDates, ...milestoneDates]
     const firstDate = all.reduce((min, d) => (d < min ? d : min), all[0])
     setViewStart(prev => (firstDate < prev ? firstDate : prev))
@@ -265,14 +265,17 @@ function GanttPage() {
   const [showActivityModal, setShowActivityModal] = useState(false)
   const [editingActivity, setEditingActivity] = useState<Milestone | null>(null)
   const [activityName, setActivityName] = useState('')
-  const [activityDate, setActivityDate] = useState(dateToStr(new Date()))
+  const [activityStartDate, setActivityStartDate] = useState(dateToStr(new Date()))
+  const [activityEndDate, setActivityEndDate] = useState(dateToStr(new Date()))
   const [activityTags, setActivityTags] = useState<string[]>(['活動'])
   const [activityDesc, setActivityDesc] = useState('')
 
   const openAddActivity = useCallback(() => {
     setEditingActivity(null)
     setActivityName('')
-    setActivityDate(dateToStr(new Date()))
+    const today = dateToStr(new Date())
+    setActivityStartDate(today)
+    setActivityEndDate(today)
     setActivityTags(['活動'])
     setActivityDesc('')
     setShowActivityModal(true)
@@ -281,7 +284,8 @@ function GanttPage() {
   const openEditActivity = useCallback((m: Milestone) => {
     setEditingActivity(m)
     setActivityName(m.name)
-    setActivityDate(m.date)
+    setActivityStartDate(m.start_date)
+    setActivityEndDate(m.end_date || m.start_date)
     setActivityTags(m.tags || ['活動'])
     setActivityDesc(m.description || '')
     setShowActivityModal(true)
@@ -289,28 +293,34 @@ function GanttPage() {
 
   const handleSaveActivity = useCallback(() => {
     if (!activityName.trim()) return
+    const start = activityStartDate || dateToStr(new Date())
+    const end = activityEndDate || start
     if (editingActivity) {
       projectStore.updateMilestone(editingActivity.id, {
         name: activityName.trim(),
-        date: activityDate,
+        start_date: start,
+        end_date: end,
         tags: activityTags,
         description: activityDesc.trim() || undefined,
       })
     } else {
       projectStore.addMilestone({
         name: activityName.trim(),
-        date: activityDate,
+        start_date: start,
+        end_date: end,
         tags: activityTags,
         description: activityDesc.trim() || undefined,
       })
     }
     setActivityName('')
-    setActivityDate(dateToStr(new Date()))
+    const today = dateToStr(new Date())
+    setActivityStartDate(today)
+    setActivityEndDate(today)
     setActivityTags(['活動'])
     setActivityDesc('')
     setShowActivityModal(false)
     setEditingActivity(null)
-  }, [activityName, activityDate, activityTags, activityDesc, editingActivity])
+  }, [activityName, activityStartDate, activityEndDate, activityTags, activityDesc, editingActivity])
 
   const handleDeleteActivity = useCallback((id: string) => {
     if (confirm('確定要刪除這個活動嗎？')) {
@@ -857,35 +867,42 @@ function GanttPage() {
                 )
               })}
 
-              {/* Milestone row */}
+              {/* Milestone row — activity bars as color blocks */}
               <rect
                 x={0} y={HEADER_HEIGHT}
                 width={totalWidth} height={MILESTONE_ROW_HEIGHT}
                 fill="#faf5ff"
               />
               {filteredMilestones.map((m) => {
-                const mIdx = dateHeaders.findIndex(h => h.dateStr === m.date)
-                if (mIdx < 0) return null
-                const mX = mIdx * DAY_WIDTH
-                const colRight = (mIdx + 1) * DAY_WIDTH
+                const startIdx = dateHeaders.findIndex(h => h.dateStr === m.start_date)
+                const endIdx = dateHeaders.findIndex(h => h.dateStr === m.end_date)
+                if (startIdx < 0 || endIdx < 0) return null
+                const mX = startIdx * DAY_WIDTH
+                const mWidth = (endIdx - startIdx + 1) * DAY_WIDTH
+                // Use a purple shade that varies by name hash for visual distinction
+                let hash = 0
+                for (let i = 0; i < m.name.length; i++) hash = ((hash << 5) - hash) + m.name.charCodeAt(i)
+                const hue = Math.abs(hash % 360)
                 return (
-                  <g key={`me-${m.id}`}>
+                  <g key={m.id}>
+                    {/* Activity bar — colored block spanning start to end date */}
                     <rect
-                      x={mX} y={HEADER_HEIGHT + 6}
-                      width={20} height={16} rx={4} fill="#A855F7" opacity={0.9}
-                    />
-                    <polygon
-                      points={`${mX + 20},${HEADER_HEIGHT + 14} ${mX + 20},${HEADER_HEIGHT + 18} ${colRight},${HEADER_HEIGHT + 16}`}
-                      fill="#A855F7" opacity={0.9}
-                    />
-                    <text
-                      x={colRight + 4}
-                      y={HEADER_HEIGHT + 18}
-                      className="fill-gray-700 cursor-pointer hover:underline"
-                      fontSize="9"
+                      x={mX + 2} y={HEADER_HEIGHT + 4}
+                      width={Math.max(mWidth - 4, 20)} height={20} rx={4}
+                      fill={`hsl(${hue}, 65%, 65%)`} opacity={0.85}
+                      stroke={`hsl(${hue}, 65%, 50%)`} strokeWidth={0.5}
+                      className="cursor-pointer"
                       onClick={() => openEditActivity(m)}
+                    />
+                    {/* Activity name label on the bar */}
+                    <text
+                      x={mX + 6} y={HEADER_HEIGHT + 17}
+                      className="fill-white"
+                      fontSize="7"
+                      fontWeight="600"
+                      pointerEvents="none"
                     >
-                      {m.name}
+                      {mWidth > 40 ? m.name.length > 8 ? m.name.slice(0, 8) + '…' : m.name : ''}
                     </text>
                   </g>
                 )
@@ -1043,14 +1060,25 @@ function GanttPage() {
                   autoFocus
                 />
               </div>
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">日期</label>
-                <input
-                  type="date"
-                  value={activityDate}
-                  onChange={e => setActivityDate(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                />
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-500 mb-1">開始日期</label>
+                  <input
+                    type="date"
+                    value={activityStartDate}
+                    onChange={e => setActivityStartDate(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-500 mb-1">結束日期</label>
+                  <input
+                    type="date"
+                    value={activityEndDate}
+                    onChange={e => setActivityEndDate(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">標籤（以逗號分隔，例如：招標,財務,開標）</label>
@@ -1077,7 +1105,8 @@ function GanttPage() {
                   <button onClick={() => {
                     projectStore.addMilestone({
                       name: editingActivity.name + 'Q',
-                      date: editingActivity.date,
+                      start_date: editingActivity.start_date,
+                      end_date: editingActivity.end_date || editingActivity.start_date,
                       tags: editingActivity.tags,
                       description: editingActivity.description,
                     })
