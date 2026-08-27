@@ -110,7 +110,7 @@ async function writeGitHubFile(token: string, filePath: string, data: unknown[],
   await fetch(`https://api.github.com/repos/PosenChen/kanban-data/contents/${filePath}`, {
     method: 'PUT',
     headers: {
-      Authorization: `Bearer ${token}`
+      Authorization: `Bearer ${token}`,
       Accept: 'application/vnd.github.v3+json',
       'Content-Type': 'application/json',
     },
