@@ -77,7 +77,7 @@ try {
 async function readGitHubFile(token: string, filePath: string): Promise<unknown[]> {
   try {
     const res = await fetch(`https://api.github.com/repos/PosenChen/kanban-data/contents/${filePath}`, {
-      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' },
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' },
       signal: AbortSignal.timeout(15000),
     })
     if (!res.ok) throw new Error(`GitHub API error for ${filePath}: ${res.status}`)
@@ -98,7 +98,7 @@ async function writeGitHubFile(token: string, filePath: string, data: unknown[],
 
   try {
     const res = await fetch(`https://api.github.com/repos/PosenChen/kanban-data/contents/${filePath}`, {
-      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' },
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' },
       signal: AbortSignal.timeout(10000),
     })
     if (res.ok) {
@@ -110,7 +110,7 @@ async function writeGitHubFile(token: string, filePath: string, data: unknown[],
   await fetch(`https://api.github.com/repos/PosenChen/kanban-data/contents/${filePath}`, {
     method: 'PUT',
     headers: {
-      Authorization: `token ${token}`,
+      Authorization: `Bearer ${token}`
       Accept: 'application/vnd.github.v3+json',
       'Content-Type': 'application/json',
     },
