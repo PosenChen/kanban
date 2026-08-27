@@ -46,9 +46,20 @@ function DailyPage() {
   const remainingLabel = remaining === 0 ? '今天' : remaining > 0 ? `剩 ${remaining} 天` : `已過 ${Math.abs(remaining)} 天`
 
   return (
-    <div className="space-y-4 md:flex md:gap-4 md:items-start">
-      {/* Date Header — spans full width */}
+    <div className="space-y-4">
+      {/* Back to overview + Date Header */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
+        {/* Back button */}
+        <button
+          onClick={() => navigate('/')}
+          className="flex items-center justify-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-3"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          返回總覽
+        </button>
+
         <div className="flex items-center justify-between mb-2">
           <button
             onClick={() => {
@@ -102,7 +113,7 @@ function DailyPage() {
       </div>
 
       {/* Three-column layout: Todos | Projects | Milestones */}
-      <div className="flex flex-col gap-4 md:flex md:gap-4 md:items-start">
+      <div className="flex flex-col md:flex md:gap-4 md:items-start">
         {/* ── Left column: Todos ── */}
         <div className="md:w-64 flex-shrink-0 space-y-4">
           <div className="bg-white rounded-xl border border-gray-200 p-4">
