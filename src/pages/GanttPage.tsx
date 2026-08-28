@@ -555,7 +555,8 @@ function GanttPage() {
     const x = offsetDays * DAY_WIDTH
     const barY = yPos + 2
     const barH = rowHeight - 4
-    const showLabel = barWidth > 36
+    // Narrow bars (single-day, 24px) show the first 2 chars; wide bars show up to 6
+    const narrowBar = barWidth <= 36
 
     return (
       <g>
@@ -569,17 +570,17 @@ function GanttPage() {
           onClick={() => handleProjectClick(project.id)}
           style={{ pointerEvents: 'auto', cursor: 'pointer' }}
         />
-        {showLabel && (
-          <text
-            x={x + 6}
-            y={barY + barH / 2 + 3}
-            className="fill-white"
-            fontSize="8"
-            pointerEvents="none"
-          >
-            {project.name.length > 6 ? project.name.slice(0, 6) + '…' : project.name}
-          </text>
-        )}
+        <text
+          x={x + (narrowBar ? 3 : 6)}
+          y={barY + barH / 2 + 3}
+          className="fill-white"
+          fontSize={narrowBar ? '7' : '8'}
+          pointerEvents="none"
+        >
+          {narrowBar
+            ? project.name.slice(0, 2)
+            : (project.name.length > 6 ? project.name.slice(0, 6) + '…' : project.name)}
+        </text>
       </g>
     )
   }
