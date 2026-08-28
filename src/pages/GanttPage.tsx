@@ -380,6 +380,7 @@ function GanttPage() {
   const statusColorMap: Record<string, string> = {
     preparation: '#FBBF24',
     in_progress: '#3B82F6',
+    waiting: '#F97316',
     completed: '#10B981',
     milestone: '#A855F7',
   }
@@ -547,9 +548,10 @@ function GanttPage() {
 
     const clampedStart = Math.max(startMs, viewStartMs)
     const clampedEnd = Math.min(endMs, viewEndMs)
-    const barDays = Math.max(0, (clampedEnd - clampedStart) / 86400000)
+    // Inclusive day count: 8/24~8/31 spans 8 day columns, not 7
+    const barDays = Math.max(1, (clampedEnd - clampedStart) / 86400000 + 1)
     const offsetDays = Math.max(0, (startMs - viewStartMs) / 86400000)
-    const barWidth = Math.max(barDays * DAY_WIDTH, DAY_WIDTH)
+    const barWidth = barDays * DAY_WIDTH
     const x = offsetDays * DAY_WIDTH
     const barY = yPos + 2
     const barH = rowHeight - 4
