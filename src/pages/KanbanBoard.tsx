@@ -27,11 +27,11 @@ function ProjectCard({ project, onEdit }: { project: Project; onEdit: (id: strin
 
   return (
     <div
-      className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-2 cursor-pointer hover:shadow-md hover:border-blue-300 transition-all group"
+      className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-3 mb-2 cursor-pointer hover:shadow-md hover:border-blue-300 transition-all group"
       onClick={() => onEdit(project.id)}
     >
       {/* Project name */}
-      <h4 className="font-medium text-gray-800 mb-2 text-sm leading-tight">{project.name}</h4>
+      <h4 className="font-medium text-gray-800 dark:text-gray-100 mb-2 text-sm leading-tight">{project.name}</h4>
       
       {/* Priority badge */}
       <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium mb-2 ${priorityConfig.color}`}>
@@ -39,7 +39,7 @@ function ProjectCard({ project, onEdit }: { project: Project; onEdit: (id: strin
       </span>
       
       {/* Progress bar */}
-      <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2">
+      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mb-2">
         <div
           className="bg-blue-500 h-1.5 rounded-full transition-all"
           style={{ width: `${progressPercent}%` }}
@@ -47,7 +47,7 @@ function ProjectCard({ project, onEdit }: { project: Project; onEdit: (id: strin
       </div>
       
       {/* Dates and status */}
-      <div className="flex items-center justify-between text-xs text-gray-500">
+      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
         <span>
           {project.start_date} ~ {project.end_date}
         </span>
@@ -107,11 +107,11 @@ function KanbanBoard() {
   const completedProjects = projects.filter(p => p.status === 'completed').length
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">專案看板</h1>
-        <div className="flex items-center gap-4 text-sm text-gray-600">
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">專案看板</h1>
+        <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300">
           <span>總計: {totalProjects} 個專案</span>
           <span>進行中: {activeProjects}</span>
           <span>已完成: {completedProjects}</span>
@@ -129,8 +129,8 @@ function KanbanBoard() {
             >
               {/* Column header */}
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-gray-800">{column.label}</h3>
-                <span className="bg-white px-2 py-0.5 rounded-full text-xs font-medium text-gray-600">
+                <h3 className="font-semibold text-gray-800 dark:text-gray-100">{column.label}</h3>
+                <span className="bg-white dark:bg-gray-800 px-2 py-0.5 rounded-full text-xs font-medium text-gray-600 dark:text-gray-300">
                   {columnProjects.length}
                 </span>
               </div>
@@ -151,7 +151,7 @@ function KanbanBoard() {
                           e.stopPropagation()
                           handleDeleteProject(project.id)
                         }}
-                        className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                        className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-500 transition-colors"
                         title="刪除專案"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -165,7 +165,7 @@ function KanbanBoard() {
               
               {/* Empty state */}
               {columnProjects.length === 0 && (
-                <div className="text-center py-8 text-gray-400 text-sm">
+                <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-sm">
                   尚無專案
                 </div>
               )}

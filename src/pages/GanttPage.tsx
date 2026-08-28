@@ -4,6 +4,7 @@ import { useProjects } from '@/hooks/useProjects'
 import { projectStore, setStorageSource } from '@/data/localStorageStore'
 import { STATUS_CONFIG, type Project, type Milestone, type Todo, type ProjectPriority } from '@/types/project'
 import { dateToStr } from '@/utils/dateUtils'
+import { useTheme } from '@/utils/theme'
 
 // ── Constants ──
 const DAY_WIDTH = 24      // 1 day = 24px
@@ -43,9 +44,12 @@ interface DayHeader {
 }
 
 function GanttPage() {
+  const [theme] = useTheme()
+  const dk = theme === 'dark'
   const navigate = useNavigate()
   const { projects, add, remove, moveProjectUp, moveProjectDown } = useProjects()
   const [milestones, setMilestones] = useState<Milestone[]>(() => projectStore.getMilestones())
+
   const rowGroups = useMemo(() => buildRowGroups(projects), [projects])
 
   // ── View state ──
@@ -573,7 +577,7 @@ function GanttPage() {
   return (
     <div className="space-y-3">
       {/* Toolbar */}
-      <div className="bg-white rounded-lg border border-gray-200 p-3 space-y-3">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-3">
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
             <input
@@ -581,9 +585,9 @@ function GanttPage() {
               placeholder="搜尋專案、標籤..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+              className="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
             />
-            <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
@@ -591,7 +595,7 @@ function GanttPage() {
             <select
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
-              className="text-sm border border-gray-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
               <option value="">狀態 ▾</option>
               <option value="preparation">準備中</option>
@@ -602,7 +606,7 @@ function GanttPage() {
             <select
               value={priorityFilter}
               onChange={e => setPriorityFilter(e.target.value)}
-              className="text-sm border border-gray-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
               <option value="">優先級 ▾</option>
               <option value="high">高</option>
@@ -662,7 +666,7 @@ function GanttPage() {
         <div className="flex items-center gap-3 flex-wrap">
           {allTags.length > 0 && (
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-gray-500">標籤:</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">標籤:</span>
               {allTags.map(tag => (
                 <button
                   key={tag}
@@ -670,7 +674,7 @@ function GanttPage() {
                   className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${
                     selectedTags.includes(tag)
                       ? 'bg-blue-500 text-white border-blue-500'
-                      : 'border-gray-300 text-gray-600 hover:border-blue-400'
+                      : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-blue-400'
                   }`}
                 >
                   #{tag}
@@ -688,17 +692,17 @@ function GanttPage() {
       </div>
 
       {/* Gantt Chart — frozen sidebar + scrollable right */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
         {/* Scroll controls bar */}
-        <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
+        <div className="flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2">
-            <button onClick={handleScrollLeft} className="p-1 text-gray-500 hover:text-blue-500 hover:bg-gray-200 rounded transition-colors" title="往前">
+            <button onClick={handleScrollLeft} className="p-1 text-gray-500 dark:text-gray-400 hover:text-blue-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors" title="往前">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             </button>
-            <button onClick={handleScrollRight} className="p-1 text-gray-500 hover:text-blue-500 hover:bg-gray-200 rounded transition-colors" title="往後">
+            <button onClick={handleScrollRight} className="p-1 text-gray-500 dark:text-gray-400 hover:text-blue-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors" title="往後">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
             </button>
-            <button onClick={handleScrollToToday} className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 transition-colors">今天</button>
+            <button onClick={handleScrollToToday} className="px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">今天</button>
           </div>
         </div>
 
@@ -706,24 +710,24 @@ function GanttPage() {
         <div className="relative" style={{ height: totalGanttHeight + HEADER_HEIGHT }}>
           {/* ══════════ FROZEN LEFT SIDEBAR (HTML, never scrolls) ══════════ */}
           <div
-            className="absolute left-0 top-0 bg-white overflow-hidden z-10"
-            style={{ width: SIDEBAR_WIDTH, height: totalGanttHeight + HEADER_HEIGHT, borderRight: '1px solid #e5e7eb' }}
+            className="absolute left-0 top-0 bg-white dark:bg-gray-800 overflow-hidden z-10"
+            style={{ width: SIDEBAR_WIDTH, height: totalGanttHeight + HEADER_HEIGHT, borderRight: `1px solid ${dk ? '#374151' : '#e5e7eb'}` }}
           >
             {/* Date header row — no month/day numbers, just a thin strip */}
             <div
-              className="flex items-center border-b border-gray-200"
+              className="flex items-center border-b border-gray-200 dark:border-gray-700"
               style={{ height: HEADER_HEIGHT }}
             >
               <div className="flex-1 flex items-center px-1">
-                <span className="text-[8px] text-gray-400 font-medium truncate">專案名稱</span>
+                <span className="text-[8px] text-gray-400 dark:text-gray-500 font-medium truncate">專案名稱</span>
               </div>
               <div className="w-[42px] flex-shrink-0"></div>
             </div>
 
             {/* Milestone label row */}
             <div
-              className="flex items-center border-b border-purple-200"
-              style={{ height: MILESTONE_ROW_HEIGHT, backgroundColor: '#faf5ff' }}
+              className="flex items-center border-b border-purple-200 dark:border-purple-900"
+              style={{ height: MILESTONE_ROW_HEIGHT, backgroundColor: dk ? '#2e1065' : '#faf5ff' }}
             >
               <span className="flex-1 px-1 text-[9px] text-purple-600 font-medium truncate">活動</span>
               <div className="w-[42px] flex-shrink-0"></div>
@@ -748,8 +752,8 @@ function GanttPage() {
                 return (
                   <div
                     key={isRoot ? `root-${project.id}` : `sub-${project.id}`}
-                    className="flex items-center border-b border-gray-100 cursor-pointer hover:bg-blue-50"
-                    style={{ height: rowHeight, backgroundColor: bgEven ? '#ffffff' : '#fafafa' }}
+                    className="flex items-center border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950"
+                    style={{ height: rowHeight, backgroundColor: bgEven ? (dk ? '#1f2937' : '#ffffff') : (dk ? '#111827' : '#fafafa') }}
                     onClick={() => handleProjectClick(project.id)}
                   >
                     {/* Project name — CSS text-overflow: ellipsis guarantees no overflow */}
@@ -761,7 +765,7 @@ function GanttPage() {
                       <div className="flex flex-col gap-0 pointer-events-auto flex-shrink-0">
                         {canMoveUp && (
                           <span
-                            className="cursor-pointer hover:bg-blue-200 rounded w-[14px] h-[10px] flex items-center justify-center text-[8px] text-gray-300 hover:text-blue-500"
+                            className="cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-900 w-[14px] h-[10px] flex items-center justify-center text-[8px] text-gray-300 hover:text-blue-500"
                             onClick={(e) => {
                               e.stopPropagation()
                               handleMoveProjectUp(sortParentId, project.id)
@@ -773,7 +777,7 @@ function GanttPage() {
                         )}
                         {canMoveDown && (
                           <span
-                            className="cursor-pointer hover:bg-blue-200 rounded w-[14px] h-[10px] flex items-center justify-center text-[8px] text-gray-300 hover:text-blue-500"
+                            className="cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-900 w-[14px] h-[10px] flex items-center justify-center text-[8px] text-gray-300 hover:text-blue-500"
                             onClick={(e) => {
                               e.stopPropagation()
                               handleMoveProjectDown(sortParentId, project.id)
@@ -785,7 +789,7 @@ function GanttPage() {
                         )}
                       </div>
                       <span className={`text-[10px] truncate block leading-none pointer-events-none ${
-                        isRoot ? 'font-medium text-gray-800' : 'text-gray-500'
+                        isRoot ? 'font-medium text-gray-800 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'
                       }`}>
                         {isRoot
                           ? project.name
@@ -797,7 +801,7 @@ function GanttPage() {
                     <div className="w-[22px] flex-shrink-0 flex items-center justify-center pointer-events-auto">
                       {isRoot && sc > 0 && (
                         <span
-                          className="cursor-pointer hover:bg-blue-200 rounded w-[14px] h-[14px] flex items-center justify-center text-[10px] font-bold transition-colors bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-blue-600"
+                          className="cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-900 w-[14px] h-[14px] flex items-center justify-center text-[10px] font-bold transition-colors bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-300 hover:text-blue-600"
                           onClick={(e) => { e.stopPropagation(); toggleExpand(project.id) }}
                           title={exp ? '收起' : '展開'}
                         >
@@ -819,19 +823,19 @@ function GanttPage() {
               className="min-w-full"
             >
               {/* Date header background */}
-              <rect x={0} y={0} width={totalWidth} height={HEADER_HEIGHT} fill="#f9fafb" />
+              <rect x={0} y={0} width={totalWidth} height={HEADER_HEIGHT} fill={dk ? '#1f2937' : '#f9fafb'} />
 
               {/* Date columns */}
               {dateHeaders.map((h, i) => {
                 const xPos = i * DAY_WIDTH
                 const isWeekend = h.dayOfWeek === 0 || h.dayOfWeek === 6
-                const bgColor = isWeekend ? '#f3f4f6' : '#fff'
+                const bgColor = isWeekend ? (dk ? '#111827' : '#f3f4f6') : (dk ? '#1f2937' : '#fff')
                 return (
                   <g key={`col-${i}`}>
                     <rect x={xPos} y={0} width={DAY_WIDTH} height={HEADER_HEIGHT} fill={bgColor} />
                     <line
                       x1={xPos} y1={0} x2={xPos} y2={HEADER_HEIGHT}
-                      stroke={h.isMonthStart ? '#d1d5db' : '#e5e7eb'}
+                      stroke={h.isMonthStart ? (dk ? '#4b5563' : '#d1d5db') : (dk ? '#374151' : '#e5e7eb')}
                       strokeWidth={h.isMonthStart ? 1.5 : 0.5}
                     />
                     {/* Day number centered in column — red for today */}
@@ -839,7 +843,7 @@ function GanttPage() {
                       x={xPos + DAY_WIDTH / 2}
                       y={16}
                       textAnchor="middle"
-                      className={h.isToday ? 'fill-red-600 font-bold' : 'fill-gray-600'}
+                      fill={h.isToday ? '#ef4444' : (dk ? '#9ca3af' : '#4b5563')}
                       fontSize="8"
                     >
                       {h.dayNum}
@@ -850,7 +854,7 @@ function GanttPage() {
                         x={xPos}
                         y={HEADER_HEIGHT - 4}
                         textAnchor="start"
-                        className="fill-blue-600 font-bold"
+                        className="font-bold" fill={dk ? '#60a5fa' : '#2563eb'}
                         fontSize="8"
                       >
                         {h.month}/{h.dayNum}
@@ -871,7 +875,7 @@ function GanttPage() {
               <rect
                 x={0} y={HEADER_HEIGHT}
                 width={totalWidth} height={MILESTONE_ROW_HEIGHT}
-                fill="#faf5ff"
+                fill={dk ? '#2e1065' : '#faf5ff'}
               />
               {filteredMilestones.map((m) => {
                 const startIdx = dateHeaders.findIndex(h => h.dateStr === m.start_date)
@@ -918,7 +922,7 @@ function GanttPage() {
                     <rect
                       x={0} y={row.y}
                       width={totalWidth} height={row.h}
-                      fill={idx % 2 === 0 ? '#ffffff' : '#fafafa'}
+                      fill={idx % 2 === 0 ? (dk ? '#1f2937' : '#ffffff') : (dk ? '#111827' : '#fafafa')}
                       onClick={() => handleProjectClick(project.id)}
                       style={{ cursor: 'pointer' }}
                     />
@@ -941,21 +945,21 @@ function GanttPage() {
         </div>
 
         {/* Info bar */}
-        <div className="px-4 py-2 bg-blue-50 border-t border-blue-200 text-xs text-blue-700">
+        <div className="px-4 py-2 bg-blue-50 dark:bg-blue-950 border-t border-blue-200 dark:border-blue-900 text-xs text-blue-700">
           💡 左右箭頭按鈕瀏覽時間軸 · 點擊日期進入日曆視圖 · 點擊專案進入詳細頁面 · 活動列在專案上方 · 左側為凍結欄
         </div>
       </div>
 
       {/* Todo list section */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
             <svg className="w-4 h-4 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
             </svg>
             待辦事項
             {sortedTodos.length > 0 && (
-              <span className="bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full text-xs">
+              <span className="bg-teal-100 dark:bg-teal-900 text-teal-700 dark:text-teal-300 px-2 py-0.5 rounded-full text-xs">
                 {sortedTodos.filter(t => !t.completed).length}/{sortedTodos.length}
               </span>
             )}
@@ -963,7 +967,7 @@ function GanttPage() {
         </div>
 
         {sortedTodos.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">還沒有待辦事項，點擊上方「待辦」按鈕新增</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">還沒有待辦事項，點擊上方「待辦」按鈕新增</p>
         ) : (
           <div className="space-y-2">
             {sortedTodos.map(todo => (
@@ -971,8 +975,8 @@ function GanttPage() {
                 key={todo.id}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors ${
                   todo.completed
-                    ? 'bg-gray-50 border-gray-200'
-                    : 'bg-white border-gray-200 hover:border-gray-300'
+                    ? 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+                    : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:border-gray-600'
                 }`}
               >
                 <button
@@ -980,7 +984,7 @@ function GanttPage() {
                   className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
                     todo.completed
                       ? 'bg-teal-500 border-teal-500'
-                      : 'border-gray-300 hover:border-teal-400'
+                      : 'border-gray-300 dark:border-gray-600 hover:border-teal-400'
                   }`}
                 >
                   {todo.completed && (
@@ -998,8 +1002,8 @@ function GanttPage() {
                 <span
                   className={`flex-1 text-sm cursor-pointer ${
                     todo.completed
-                      ? 'line-through text-gray-400'
-                      : 'text-gray-700 hover:text-gray-900'
+                      ? 'line-through text-gray-400 dark:text-gray-500'
+                      : 'text-gray-700 dark:text-gray-200 hover:text-gray-900'
                   }`}
                   onClick={() => openEditTodo(todo)}
                 >
@@ -1009,7 +1013,7 @@ function GanttPage() {
                 <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
                   todo.priority === 'high' ? 'text-red-600 bg-red-50' :
                   todo.priority === 'medium' ? 'text-yellow-600 bg-yellow-50' :
-                  'text-gray-500 bg-gray-50'
+                  'text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900'
                 }`}>
                   {todo.priority === 'high' ? '高' : todo.priority === 'medium' ? '中' : '低'}
                 </span>
@@ -1018,7 +1022,7 @@ function GanttPage() {
                 <div className="flex flex-col gap-0 pointer-events-auto">
                   {sortedTodos.indexOf(todo) > 0 && (
                     <span
-                      className="cursor-pointer hover:bg-blue-200 rounded w-[12px] h-[8px] flex items-center justify-center text-[6px] text-gray-400 hover:text-blue-600"
+                      className="cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-900 w-[12px] h-[8px] flex items-center justify-center text-[6px] text-gray-400 dark:text-gray-500 hover:text-blue-600"
                       onClick={(e) => { e.stopPropagation(); handleMoveTodoUp(todo.id) }}
                       title="上移"
                     >
@@ -1027,7 +1031,7 @@ function GanttPage() {
                   )}
                   {sortedTodos.indexOf(todo) < sortedTodos.length - 1 && (
                     <span
-                      className="cursor-pointer hover:bg-blue-200 rounded w-[12px] h-[8px] flex items-center justify-center text-[6px] text-gray-400 hover:text-blue-600"
+                      className="cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-900 w-[12px] h-[8px] flex items-center justify-center text-[6px] text-gray-400 dark:text-gray-500 hover:text-blue-600"
                       onClick={(e) => { e.stopPropagation(); handleMoveTodoDown(todo.id) }}
                       title="下移"
                     >
@@ -1044,58 +1048,58 @@ function GanttPage() {
       {/* Add/edit activity modal */}
       {showActivityModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-80">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-80">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <span className="text-purple-500">🚩</span> {editingActivity ? '編輯活動' : '新增活動'}
             </h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm text-gray-600 mb-1">名稱</label>
+                <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">名稱</label>
                 <input
                   type="text"
                   value={activityName}
                   onChange={e => setActivityName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm"
                   placeholder="例：第一次開標"
                   autoFocus
                 />
               </div>
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <label className="block text-xs text-gray-500 mb-1">開始日期</label>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">開始日期</label>
                   <input
                     type="date"
                     value={activityStartDate}
                     onChange={e => setActivityStartDate(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm"
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="block text-xs text-gray-500 mb-1">結束日期</label>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">結束日期</label>
                   <input
                     type="date"
                     value={activityEndDate}
                     onChange={e => setActivityEndDate(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm text-gray-600 mb-1">標籤（以逗號分隔，例如：招標,財務,開標）</label>
+                <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">標籤（以逗號分隔，例如：招標,財務,開標）</label>
                 <input
                   type="text"
                   value={activityTags.join('、')}
                   onChange={e => setActivityTags(e.target.value.split('、').map(t => t.trim()).filter(Boolean))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm"
                   placeholder="例：招標、財務"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-600 mb-1">說明 / 備註</label>
+                <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">說明 / 備註</label>
                 <textarea
                   value={activityDesc}
                   onChange={e => setActivityDesc(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none"
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm resize-none"
                   rows={3}
                   placeholder="輸入活動說明或備註（選填）"
                 />
@@ -1121,7 +1125,7 @@ function GanttPage() {
                 </div>
               )}
               <div className="flex gap-2 pt-2">
-                <button onClick={() => { setShowActivityModal(false); setEditingActivity(null) }} className="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">
+                <button onClick={() => { setShowActivityModal(false); setEditingActivity(null) }} className="flex-1 px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
                   取消
                 </button>
                 <button onClick={handleSaveActivity} disabled={!activityName.trim()} className="flex-1 px-3 py-2 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
@@ -1136,28 +1140,28 @@ function GanttPage() {
       {/* Add/edit todo modal */}
       {showTodoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-80">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-80">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <span className="text-teal-500">✅</span> {editingTodo ? '編輯待辦' : '新增待辦'}
             </h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm text-gray-600 mb-1">名稱</label>
+                <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">名稱</label>
                 <input
                   type="text"
                   value={todoName}
                   onChange={e => setTodoName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm"
                   placeholder="輸入待辦名稱"
                   autoFocus
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-600 mb-1">優先級</label>
+                <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">優先級</label>
                 <select
                   value={todoPriority}
                   onChange={e => setTodoPriority(e.target.value as ProjectPriority)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm"
                 >
                   <option value="high">高</option>
                   <option value="medium">中</option>
@@ -1165,11 +1169,11 @@ function GanttPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm text-gray-600 mb-1">說明 / 備註</label>
+                <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">說明 / 備註</label>
                 <textarea
                   value={todoDesc}
                   onChange={e => setTodoDesc(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none"
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm resize-none"
                   rows={3}
                   placeholder="輸入待辦說明或備註（選填）"
                 />
@@ -1185,7 +1189,7 @@ function GanttPage() {
                 </div>
               )}
               <div className="flex gap-2 pt-2">
-                <button onClick={() => { setShowTodoModal(false); setEditingTodo(null) }} className="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">
+                <button onClick={() => { setShowTodoModal(false); setEditingTodo(null) }} className="flex-1 px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
                   取消
                 </button>
                 <button onClick={handleSaveTodo} disabled={!todoName.trim()} className="flex-1 px-3 py-2 text-sm bg-teal-500 text-white rounded-lg hover:bg-teal-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">

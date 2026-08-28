@@ -4,6 +4,7 @@ import ProjectDetailPage from './pages/ProjectDetailPage'
 import DailyPage from './pages/DailyPage'
 import SettingsPage from './pages/SettingsPage'
 import KanbanBoard from './pages/KanbanBoard'
+import ThemeToggle from './components/ThemeToggle'
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Route path="/daily/:date?" element={<DailyPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Routes>
+      <ThemeToggle />
     </HashRouter>
   )
 }

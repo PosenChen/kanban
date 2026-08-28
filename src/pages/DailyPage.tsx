@@ -49,11 +49,11 @@ function DailyPage() {
   return (
     <div className="space-y-4">
       {/* Back to overview + Date Header */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 text-center">
         {/* Back button */}
         <button
           onClick={() => navigate('/')}
-          className="flex items-center justify-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-3"
+          className="flex items-center justify-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200 mb-3"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -68,7 +68,7 @@ function DailyPage() {
               prev.setDate(prev.getDate() - 1)
               navigate(`/daily/${dateToStr(prev)}`)
             }}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:text-gray-300"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -76,8 +76,8 @@ function DailyPage() {
           </button>
 
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">{formatMonthDay(targetDate)}</h1>
-            <p className="text-gray-500">
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{formatMonthDay(targetDate)}</h1>
+            <p className="text-gray-500 dark:text-gray-400">
               週{dayOfWeek}
               {' · '}
               <span className={`font-medium ${
@@ -96,7 +96,7 @@ function DailyPage() {
               next.setDate(next.getDate() + 1)
               navigate(`/daily/${dateToStr(next)}`)
             }}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:text-gray-300"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -109,7 +109,7 @@ function DailyPage() {
           type="date"
           defaultValue={targetDate}
           onChange={e => navigate(`/daily/${e.target.value}`)}
-          className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-blue-400 mt-2"
+          className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-blue-400 mt-2"
         />
       </div>
 
@@ -117,33 +117,33 @@ function DailyPage() {
       <div className="flex flex-col md:flex-row md:gap-4 md:items-start">
         {/* ── Left column: Todos ── */}
         <div className="md:w-64 flex-shrink-0 space-y-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5 mb-3">
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+            <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-1.5 mb-3">
               <svg className="w-4 h-4 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
               </svg>
               待辦事項
               {todayTodos.length > 0 && (
-                <span className="bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full text-xs">
+                <span className="bg-teal-100 dark:bg-teal-900 text-teal-700 dark:text-teal-300 px-2 py-0.5 rounded-full text-xs">
                   {todayTodos.filter(t => !t.completed).length}/{todayTodos.length}
                 </span>
               )}
             </h2>
             {todayTodos.length === 0 ? (
-              <p className="text-xs text-gray-400 text-center py-4">暫無待辦事項</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">暫無待辦事項</p>
             ) : (
               <div className="space-y-2">
                 {todayTodos.map(todo => (
                   <div
                     key={todo.id}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
-                      todo.completed ? 'bg-gray-50 border-gray-200 opacity-60' : 'bg-white border-gray-200 hover:border-gray-300'
+                      todo.completed ? 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 opacity-60' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:border-gray-600'
                     }`}
                   >
                     <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                      todo.priority === 'high' ? 'text-red-600 bg-red-100' :
+                      todo.priority === 'high' ? 'text-red-600 bg-red-100 dark:bg-red-950' :
                       todo.priority === 'medium' ? 'text-yellow-600 bg-yellow-100' :
-                      'text-gray-500 bg-gray-100'
+                      'text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700'
                     }`}>
                       {todo.priority === 'high' ? '高' : todo.priority === 'medium' ? '中' : '低'}
                     </span>
@@ -255,7 +255,7 @@ function DailyPage() {
 
           {/* No projects placeholder */}
           {inProgress.length === 0 && preparing.length === 0 && completingToday.length === 0 && startingToday.length === 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 text-center text-gray-400 dark:text-gray-500">
               <p className="text-sm">這天沒有專案活動</p>
             </div>
           )}
@@ -264,7 +264,7 @@ function DailyPage() {
         {/* ── Right column: Milestones / Activities ── */}
         <div className="md:w-64 flex-shrink-0">
           {futureMilestones.length > 0 ? (
-            <div className="bg-white rounded-xl border border-purple-200">
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-purple-200 dark:border-purple-900">
               <h2 className="text-sm font-semibold text-purple-600 px-4 pt-4 flex items-center gap-1.5">
                 <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -283,26 +283,26 @@ function DailyPage() {
                   const mRemaining = getRemainingDays(rangeEnd)
                   const mLabel = mRemaining === 0 ? '今天' : mRemaining > 0 ? `剩 ${mRemaining} 天` : `已過 ${Math.abs(mRemaining)} 天`
                   return (
-                    <div key={milestone.id} className="flex items-start gap-2 py-2 border-b border-gray-100 last:border-b-0">
-                      <div className="text-xs font-mono text-gray-400 w-11 flex-shrink-0 mt-0.5">{dateDisplay}</div>
+                    <div key={milestone.id} className="flex items-start gap-2 py-2 border-b border-gray-100 dark:border-gray-700 last:border-b-0">
+                      <div className="text-xs font-mono text-gray-400 dark:text-gray-500 w-11 flex-shrink-0 mt-0.5">{dateDisplay}</div>
                       <div className="flex-1 min-w-0">
                         <div className={`text-xs font-medium ${
-                          mRemaining < 0 ? 'text-gray-400 line-through' : 'text-gray-800'
+                          mRemaining < 0 ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-800 dark:text-gray-100'
                         }`}>
                           {milestone.name}
                         </div>
                         {milestone.tags && milestone.tags.length > 0 && (
                           <div className="flex gap-0.5 mt-0.5">
                             {milestone.tags.map(tag => (
-                              <span key={tag} className="text-[10px] text-purple-400 bg-purple-50 px-1 rounded">{tag}</span>
+                              <span key={tag} className="text-[10px] text-purple-400 bg-purple-50 dark:bg-purple-950 px-1 rounded">{tag}</span>
                             ))}
                           </div>
                         )}
                       </div>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap ${
-                        mRemaining < 0 ? 'bg-gray-100 text-gray-400' :
-                        mRemaining <= 3 ? 'bg-red-100 text-red-600' :
-                        'bg-purple-100 text-purple-600'
+                        mRemaining < 0 ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500' :
+                        mRemaining <= 3 ? 'bg-red-100 dark:bg-red-950 text-red-600' :
+                        'bg-purple-100 dark:bg-purple-950 text-purple-600'
                       }`}>
                         {mLabel}
                       </span>
@@ -312,7 +312,7 @@ function DailyPage() {
               </div>
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-gray-200 p-4 text-center text-gray-400">
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center text-gray-400 dark:text-gray-500">
               <p className="text-xs">近期無活動</p>
             </div>
           )}
@@ -329,7 +329,7 @@ function DailyPage() {
               })
               navigate('/')
             }}
-            className="w-full mt-3 py-3 border-2 border-dashed border-purple-300 rounded-xl text-gray-400 hover:border-purple-400 hover:text-purple-500 transition-colors text-sm"
+            className="w-full mt-3 py-3 border-2 border-dashed border-purple-300 rounded-xl text-gray-400 dark:text-gray-500 hover:border-purple-400 hover:text-purple-500 transition-colors text-sm"
           >
             + 新增活動
           </button>
@@ -353,7 +353,7 @@ function DailyPage() {
           })
           navigate('/')
         }}
-        className="w-full md:max-w-md self-center py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors text-sm"
+        className="w-full md:max-w-md self-center py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-gray-400 dark:text-gray-500 hover:border-blue-400 hover:text-blue-500 transition-colors text-sm"
       >
         + 新增今天的專案
       </button>

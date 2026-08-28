@@ -9,7 +9,7 @@ import { useState } from 'react'
 
 function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
-  if (!id) return <div className="flex items-center justify-center h-64 text-gray-400"><p>找不到專案 ID</p></div>
+  if (!id) return <div className="flex items-center justify-center h-64 text-gray-400 dark:text-gray-500"><p>找不到專案 ID</p></div>
   const navigate = useNavigate()
   const { getById, update, remove, getByParent, getAll } = useProjects()
 
@@ -21,7 +21,7 @@ function ProjectDetailPage() {
 
   if (!project) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-400">
+      <div className="flex items-center justify-center h-64 text-gray-400 dark:text-gray-500">
         <div className="text-center">
           <p className="text-lg mb-2">找不到此專案</p>
           <button onClick={() => navigate('/')} className="text-blue-500 hover:underline">
@@ -74,7 +74,7 @@ function ProjectDetailPage() {
       {/* Back button */}
       <button
         onClick={() => navigate('/')}
-        className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+        className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -83,11 +83,11 @@ function ProjectDetailPage() {
       </button>
 
       {/* Header */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-3 flex-wrap mb-2">
-              <h1 className="text-2xl font-bold text-gray-800">{project.name}</h1>
+              <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{project.name}</h1>
               <span className={`inline-block px-2.5 py-1 rounded-full text-sm font-medium ${statusCfg.bgColor} ${statusCfg.color}`}>
                 {statusCfg.label}
               </span>
@@ -97,14 +97,14 @@ function ProjectDetailPage() {
             </div>
 
             {project.description && (
-              <p className="text-gray-600 mt-1">{project.description}</p>
+              <p className="text-gray-600 dark:text-gray-300 mt-1">{project.description}</p>
             )}
 
             {/* Tags */}
             {project.tags.length > 0 && (
               <div className="flex gap-1.5 mt-2 flex-wrap">
                 {project.tags.map((tag: string) => (
-                  <span key={tag} className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">
+                  <span key={tag} className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded-full text-xs">
                     #{tag}
                   </span>
                 ))}
@@ -130,7 +130,7 @@ function ProjectDetailPage() {
                   alert(`已複製專案「${result.project.name}」${childText}`)
                 }
               }}
-              className="px-3 py-1.5 text-sm bg-gray-100 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-200"
+              className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:bg-gray-700"
             >
               複製
             </button>
@@ -139,7 +139,7 @@ function ProjectDetailPage() {
               className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
                 confirmDelete
                   ? 'bg-red-500 text-white border-red-500'
-                  : 'border-gray-300 text-gray-500 hover:border-red-400 hover:text-red-500'
+                  : 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-red-400 hover:text-red-500'
               }`}
             >
               {confirmDelete ? '再按確認刪除' : '刪除'}
@@ -148,24 +148,24 @@ function ProjectDetailPage() {
         </div>
 
         {/* Info grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-4 border-t border-gray-100">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
           <div>
-            <div className="text-xs text-gray-400">起始日期</div>
+            <div className="text-xs text-gray-400 dark:text-gray-500">起始日期</div>
             <div className="text-sm font-medium mt-0.5">{formatMonthDay(project.start_date)}</div>
           </div>
           <div>
-            <div className="text-xs text-gray-400">結束日期</div>
+            <div className="text-xs text-gray-400 dark:text-gray-500">結束日期</div>
             <div className="text-sm font-medium mt-0.5">{formatMonthDay(project.end_date)}</div>
           </div>
           <div>
-            <div className="text-xs text-gray-400">天數</div>
+            <div className="text-xs text-gray-400 dark:text-gray-500">天數</div>
             <div className="text-sm font-medium mt-0.5">{totalDays} 天</div>
           </div>
           <div>
-            <div className="text-xs text-gray-400">剩餘天數</div>
+            <div className="text-xs text-gray-400 dark:text-gray-500">剩餘天數</div>
             <div className={`text-sm font-medium mt-0.5 ${
               remaining < 0 && project.status !== 'completed' ? 'text-red-500' :
-              remaining === 0 ? 'text-orange-500' : 'text-gray-700'
+              remaining === 0 ? 'text-orange-500' : 'text-gray-700 dark:text-gray-200'
             }`}>
               {remaining < 0 && project.status !== 'completed' ? `已逾期 ${Math.abs(remaining)} 天` : remaining === 0 ? '今天到期！' : `剩 ${remaining} 天`}
             </div>
@@ -175,7 +175,7 @@ function ProjectDetailPage() {
         {/* Progress */}
         <div className="mt-4">
           <div className="flex items-center justify-between text-sm mb-1">
-            <span className="text-gray-500">進度</span>
+            <span className="text-gray-500 dark:text-gray-400">進度</span>
             <span className="font-medium">{project.progress}%</span>
           </div>
           <input
@@ -184,9 +184,9 @@ function ProjectDetailPage() {
             max="100"
             value={project.progress}
             onChange={handleProgressChange}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
           />
-          <div className="flex justify-between text-xs text-gray-400 mt-1">
+          <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-1">
             <span>0%</span>
             <span>50%</span>
             <span>100%</span>
@@ -196,7 +196,7 @@ function ProjectDetailPage() {
 
       {/* Children / Sub-projects */}
       {children.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
           <h2 className="text-lg font-semibold mb-3">子專案（{children.length}）</h2>
           <div className="space-y-3">
             {children.map((child: Project) => {

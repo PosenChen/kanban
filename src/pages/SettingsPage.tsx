@@ -142,41 +142,41 @@ function SettingsPage() {
 
   return (
     <div className="max-w-lg mx-auto space-y-6">
-      <button onClick={() => window.history.back()} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+      <button onClick={() => window.history.back()} className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200">
         ← 返回
       </button>
 
-      <div className="bg-blue-50 rounded-lg p-4 text-sm text-blue-700">
+      <div className="bg-blue-50 dark:bg-blue-950 rounded-lg p-4 text-sm text-blue-700 dark:text-blue-300">
         <p><strong>數據持久化設置</strong></p>
         <p>手動同步機制：下載（讀取）從 GitHub 拉取資料，上傳（同步）推送資料到 GitHub</p>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-4">
         {/* 同步狀態 */}
         <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">📡 同步狀態</h3>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">📡 同步狀態</h3>
           {syncInfo.hasToken ? (
             <div className="space-y-2 text-sm">
               <p className="text-green-600 font-medium">✅ 已检测到 GitHub Token</p>
-              <p className="text-gray-500">目前使用方式：LocalStorage（本地儲存）</p>
+              <p className="text-gray-500 dark:text-gray-400">目前使用方式：LocalStorage（本地儲存）</p>
             </div>
           ) : (
             <div className="space-y-2 text-sm">
               <p className="text-orange-600 font-medium">⚠️ 未检测到 GitHub Token</p>
-              <p className="text-gray-500">目前只使用 LocalStorage（每個瀏覽器獨立保存）</p>
+              <p className="text-gray-500 dark:text-gray-400">目前只使用 LocalStorage（每個瀏覽器獨立保存）</p>
             </div>
           )}
         </div>
 
         {/* GitHub Token 輸入 */}
         <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">🔑 GitHub Personal Access Token</h3>
-          <p className="text-xs text-gray-400 mb-2">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">🔑 GitHub Personal Access Token</h3>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
             repo 權限 → GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
           </p>
           <div className="flex gap-2">
             <input type="text" id="gh-token-input" placeholder="ghp_..."
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
             <button onClick={handleSaveToken}
               className="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">儲存 Token</button>
           </div>
@@ -188,8 +188,8 @@ function SettingsPage() {
 
         {/* 手動同步按鈕 */}
         <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">🔄 手動同步</h3>
-          <p className="text-xs text-gray-400 mb-3">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">🔄 手動同步</h3>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
             點擊「下載 GitHub」從雲端拉取最新專案資料<br/>
             修改專案後 3 秒自動「上傳（同步）」到 GitHub
           </p>
@@ -220,23 +220,23 @@ function SettingsPage() {
             <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-600">✅ 同步成功！</div>
           )}
           {syncStatus === 'loading' && (
-            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-600">⏳ 讀取中...</div>
+            <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-900 rounded text-xs text-blue-600">⏳ 讀取中...</div>
           )}
         </div>
 
         {/* 備份 / 還原 */}
         <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">💾 備份 / 還原</h3>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">💾 備份 / 還原</h3>
           <div className="flex gap-3">
             <button onClick={handleExport}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100">📤 匯出 JSON</button>
+              className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:bg-gray-700">📤 匯出 JSON</button>
             <button onClick={handleImport}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100">📥 匯入 JSON</button>
+              className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:bg-gray-700">📥 匯入 JSON</button>
           </div>
         </div>
 
         {/* 使用說明 */}
-        <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-500 space-y-2">
+        <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 text-xs text-gray-500 dark:text-gray-400 space-y-2">
           <p><strong>📖 數據同步說明：</strong></p>
           <ol className="list-decimal list-inside space-y-1">
             <li>

@@ -1,1 +1,4 @@
 @import "tailwindcss";
+
+/* Class-based dark mode: .dark on <html> activates every dark: utility */
+@custom-variant dark (&:where(.dark, .dark *));

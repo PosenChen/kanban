@@ -55,12 +55,12 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects }: ProjectFo
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={onClose}>
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto"
+        className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="text-lg font-semibold">{editProject ? '編輯專案' : '新增專案'}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:text-gray-300">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -70,12 +70,12 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects }: ProjectFo
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">專案名稱 <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">專案名稱 <span className="text-red-500">*</span></label>
             <input
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
               placeholder="輸入專案名稱"
               required
             />
@@ -83,11 +83,11 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects }: ProjectFo
 
           {/* Parent */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">父專案</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">父專案</label>
             <select
               value={parentId}
               onChange={e => setParentId(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
               <option value="">無（根專案）</option>
               {rootProjects.map(r => (
@@ -99,22 +99,22 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects }: ProjectFo
           {/* Dates */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">起始日期 <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">起始日期 <span className="text-red-500">*</span></label>
               <input
                 type="date"
                 value={startDate}
                 onChange={e => setStartDate(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">結束日期 <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">結束日期 <span className="text-red-500">*</span></label>
               <input
                 type="date"
                 value={endDate}
                 onChange={e => setEndDate(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
                 required
               />
             </div>
@@ -123,11 +123,11 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects }: ProjectFo
           {/* Status & Priority */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">狀態</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">狀態</label>
               <select
                 value={status}
                 onChange={e => setStatus(e.target.value as ProjectStatus)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
               >
                 <option value="preparation">準備中</option>
                 <option value="waiting">等待中</option>
@@ -136,11 +136,11 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects }: ProjectFo
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">優先級</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">優先級</label>
               <select
                 value={priority}
                 onChange={e => setPriority(e.target.value as 'high' | 'medium' | 'low')}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
               >
                 <option value="high">高</option>
                 <option value="medium">中</option>
@@ -151,7 +151,7 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects }: ProjectFo
 
           {/* Progress */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
               進度 {editProject ? `${editProject.progress}%` : '0%'}
             </label>
             <input
@@ -167,20 +167,20 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects }: ProjectFo
 
           {/* Tags */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">標籤</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">標籤</label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={tagInput}
                 onChange={e => setTagInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag() } }}
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
                 placeholder="輸入後按 Enter"
               />
               <button
                 type="button"
                 onClick={handleAddTag}
-                className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm"
+                className="px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 text-sm"
               >
                 新增
               </button>
@@ -190,7 +190,7 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects }: ProjectFo
                 {tags.map(tag => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 dark:text-blue-300 rounded-full text-xs"
                   >
                     #{tag}
                     <button type="button" onClick={() => handleRemoveTag(tag)} className="ml-0.5 text-blue-500 hover:text-red-500">
@@ -204,12 +204,12 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects }: ProjectFo
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">說明/備註</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">說明/備註</label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               rows={3}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm resize-y"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm resize-y"
               placeholder="專案說明..."
             />
           </div>
@@ -219,7 +219,7 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects }: ProjectFo
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 text-sm"
+              className="px-4 py-2 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm"
             >
               取消
             </button>

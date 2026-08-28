@@ -39,10 +39,10 @@ export type ProjectStatusLabel = {
 }
 
 export const STATUS_CONFIG: Record<ProjectStatus, ProjectStatusLabel> = {
-  preparation: { key: 'preparation', label: '準備中', color: 'text-yellow-700', bgColor: 'bg-yellow-400' },
-  in_progress: { key: 'in_progress', label: '進行中', color: 'text-blue-700', bgColor: 'bg-blue-500' },
-  waiting:     { key: 'waiting',     label: '等待中', color: 'text-orange-700', bgColor: 'bg-orange-400' },
-  completed:   { key: 'completed',   label: '已完成', color: 'text-green-700', bgColor: 'bg-green-500' },
+  preparation: { key: 'preparation', label: '準備中', color: 'text-yellow-700 dark:text-yellow-400', bgColor: 'bg-yellow-400' },
+  in_progress: { key: 'in_progress', label: '進行中', color: 'text-blue-700 dark:text-blue-400', bgColor: 'bg-blue-500' },
+  waiting:     { key: 'waiting',     label: '等待中', color: 'text-orange-700 dark:text-orange-400', bgColor: 'bg-orange-400' },
+  completed:   { key: 'completed',   label: '已完成', color: 'text-green-700 dark:text-green-400', bgColor: 'bg-green-500' },
 }
 
 export type PriorityLabel = {
@@ -52,9 +52,9 @@ export type PriorityLabel = {
 }
 
 export const PRIORITY_CONFIG: Record<ProjectPriority, PriorityLabel> = {
-  high:    { key: 'high',    label: '高',    color: 'text-red-600 bg-red-100' },
-  medium:  { key: 'medium',  label: '中',    color: 'text-yellow-600 bg-yellow-100' },
-  low:     { key: 'low',     label: '低',    color: 'text-gray-500 bg-gray-100' },
+  high:    { key: 'high',    label: '高',    color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-950' },
+  medium:  { key: 'medium',  label: '中',    color: 'text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-950' },
+  low:     { key: 'low',     label: '低',    color: 'text-gray-500 bg-gray-100 dark:text-gray-400 dark:bg-gray-700' },
 }
 
 export interface Todo {
