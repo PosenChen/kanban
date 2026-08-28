@@ -519,17 +519,25 @@ function GanttPage() {
 
   // Build SVG rows with y-offsets
   const svgRows = useMemo(() => {
-    const rows: Array<{ project: Project; isRoot: boolean; y: number; h: number }> = []
+    const rows: Array<{ project: Project; isRoot: boolean; y: number; h: number; groupId: string; milestoneChildren?: Project[] }> = []
     let y = HEADER_HEIGHT + MILESTONE_ROW_HEIGHT
     for (const group of filteredGroups) {
       const rootProject = projects.find(p => p.id === group.projectId)
       if (!rootProject) continue
-      rows.push({ project: rootProject, isRoot: true, y, h: PARENT_ROW_HEIGHT })
-      y += PARENT_ROW_HEIGHT
       const isExpanded = expandedParents.has(group.projectId)
+      rows.push({
+        project: rootProject,
+        isRoot: true,
+        y,
+        h: PARENT_ROW_HEIGHT,
+        groupId: group.projectId,
+        // Collapsed: single-day children render as milestone diamonds on the parent row
+        milestoneChildren: isExpanded ? [] : group.subProjects.filter(s => s.start_date === s.end_date),
+      })
+      y += PARENT_ROW_HEIGHT
       if (isExpanded) {
         for (const s of group.subProjects) {
-          rows.push({ project: s, isRoot: false, y, h: SUB_ROW_HEIGHT })
+          rows.push({ project: s, isRoot: false, y, h: SUB_ROW_HEIGHT, groupId: group.projectId })
           y += SUB_ROW_HEIGHT
         }
       }
@@ -940,6 +948,32 @@ function GanttPage() {
                     />
                     {/* Gantt bar */}
                     {barRect}
+                    {/* Collapsed group: single-day children as milestone diamonds (click to expand) */}
+                    {row.milestoneChildren?.map(mc => {
+                      const dIdx = dateHeaders.findIndex(h => h.dateStr === mc.start_date)
+                      if (dIdx < 0) return null
+                      const cx = dIdx * DAY_WIDTH + DAY_WIDTH / 2
+                      const cy = row.y + row.h / 2
+                      return (
+                        <rect
+                          key={`md-${mc.id}`}
+                          x={cx - 4} y={cy - 4}
+                          width={8} height={8} rx={1.5}
+                          transform={`rotate(45 ${cx} ${cy})`}
+                          fill={statusColorMap[mc.status] || '#3B82F6'}
+                          stroke={dk ? '#111827' : '#ffffff'}
+                          strokeWidth={1}
+                          opacity={0.95}
+                          className="cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleExpand(row.groupId)
+                          }}
+                        >
+                          <title>{`${mc.name} (${mc.start_date})`}</title>
+                        </rect>
+                      )
+                    })}
                   </g>
                 )
               })}
