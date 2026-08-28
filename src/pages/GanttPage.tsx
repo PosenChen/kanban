@@ -69,7 +69,15 @@ function GanttPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set())
+  // Persisted in localStorage so the tree stays expanded across pages/reloads
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem('kanban_expanded')
+      return raw ? new Set(JSON.parse(raw) as string[]) : new Set()
+    } catch {
+      return new Set()
+    }
+  })
   const [justCopiedParentId, setJustCopiedParentId] = useState<string | null>(null)
 
   // Auto-expand newly copied parent so children are visible
@@ -94,6 +102,7 @@ function GanttPage() {
     setExpandedParents(prev => {
       const next = new Set(prev)
       next.has(parentId) ? next.delete(parentId) : next.add(parentId)
+      try { localStorage.setItem('kanban_expanded', JSON.stringify([...next])) } catch { /* ignore */ }
       return next
     })
   }, [])
@@ -478,14 +487,13 @@ function GanttPage() {
       })
 
       if (isExpanded) {
-        // Root + children form one sibling group — sort by sort_order
-        const allChildren = [rootProject, ...group.subProjects].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-        const total = allChildren.length
-        allChildren.forEach((child, i) => {
-          const isRootOfGroup = child.id === group.projectId
+        // Children only — root is NOT repeated (must stay in lockstep with svgRows)
+        const childList = [...group.subProjects].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+        const total = childList.length
+        childList.forEach((child, i) => {
           rows.push({
             project: child,
-            isRoot: isRootOfGroup,
+            isRoot: false,
             groupId: group.projectId,
             isFirstSibling: i === 0,
             isLastSibling: i === total - 1,
@@ -899,6 +907,7 @@ function GanttPage() {
                       onClick={() => openEditActivity(m)}
                     />
                     {/* Activity name label on the bar */}
+                    {/* Activity name: full-ish label when wide, first 2 chars on 1-day (narrow) bars */}
                     <text
                       x={mX + 6} y={HEADER_HEIGHT + 17}
                       className="fill-white"
@@ -906,7 +915,7 @@ function GanttPage() {
                       fontWeight="600"
                       pointerEvents="none"
                     >
-                      {mWidth > 40 ? m.name.length > 8 ? m.name.slice(0, 8) + '…' : m.name : ''}
+                      {mWidth > 40 ? (m.name.length > 8 ? m.name.slice(0, 8) + '…' : m.name) : m.name.slice(0, 2)}
                     </text>
                   </g>
                 )
