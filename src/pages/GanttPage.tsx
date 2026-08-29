@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
-import { projectStore, setStorageSource } from '@/data/localStorageStore'
+import { projectStore, setStorageSource, isColorByPriority, STORAGE_KEY_COLOR_BY_PRIORITY } from '@/data/localStorageStore'
 import { STATUS_CONFIG, type Project, type Milestone, type Todo, type ProjectPriority } from '@/types/project'
 import { dateToStr } from '@/utils/dateUtils'
 import { useTheme } from '@/utils/theme'
@@ -84,7 +84,7 @@ interface DayHeader {
 function GanttPage() {
   const [theme] = useTheme()
   const dk = theme === 'dark'
-  const [colorByPriority, setColorByPriority] = useState(() => localStorage.getItem('kanban_color_by_priority') !== 'false')
+  const [colorByPriority, setColorByPriority] = useState(isColorByPriority)
   const navigate = useNavigate()
   const { projects, add, remove, moveProjectUp, moveProjectDown } = useProjects()
   const [milestones, setMilestones] = useState<Milestone[]>(() => projectStore.getMilestones())
@@ -750,7 +750,7 @@ function GanttPage() {
                 checked={colorByPriority}
                 onChange={e => {
                   setColorByPriority(e.target.checked)
-                  localStorage.setItem('kanban_color_by_priority', String(e.target.checked))
+                  localStorage.setItem(STORAGE_KEY_COLOR_BY_PRIORITY, String(e.target.checked))
                   window.dispatchEvent(new CustomEvent('kanban:filter-change'))
                 }}
                 className="w-3.5 h-3.5 accent-blue-500"

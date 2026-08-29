@@ -7,6 +7,12 @@ const STORAGE_KEY_MILESTONES = 'kanban_milestones'
 const STORAGE_KEY_TODOS = 'kanban_todos'
 const STORAGE_KEY_TOKEN = 'kanban_github_token'
 const STORAGE_KEY_SOURCE = 'kanban_storage_source'
+export const STORAGE_KEY_COLOR_BY_PRIORITY = 'kanban_color_by_priority'
+
+/** Default ON unless the user explicitly turned it off ('false'). */
+export function isColorByPriority(): boolean {
+  return localStorage.getItem(STORAGE_KEY_COLOR_BY_PRIORITY) !== 'false'
+}
 
 const GITHUB_PROJECTS_PATH = 'data/projects.json'
 const GITHUB_MILESTONES_PATH = 'data/milestones.json'
