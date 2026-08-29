@@ -54,7 +54,10 @@ function hexToHsl(hex: string): [number, number, number] {
 function desaturate(hexColor: string, s: number, dark: boolean): string {
   if (s >= 100) return hexColor
   const [h, , l0] = hexToHsl(hexColor)
-  const lightness = Math.round(dark ? Math.min(52, l0 * Math.sqrt(s / 100)) : 58 + (100 - s) * 0.075)
+  // dark: clamp 52 so bars don't glow pale; light: clamp 54 so white bar labels stay legible
+  const lightness = Math.round(
+    dark ? Math.min(52, l0 * Math.sqrt(s / 100)) : Math.min(54, 50 + (100 - s) * 0.045)
+  )
   return `hsl(${h}, ${s}%, ${lightness}%)`
 }
 
@@ -780,7 +783,8 @@ function GanttPage() {
               </span>
             ))}
           </div>
-        )}      </div>
+        )}
+      </div>
 
       {/* Gantt Chart — frozen sidebar + scrollable right */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
