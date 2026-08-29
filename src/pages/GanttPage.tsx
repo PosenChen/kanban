@@ -17,10 +17,45 @@ const SIDEBAR_WIDTH = FROZEN_WIDTH  // 96px
 const SIDEBAR_EXPAND_BTN = 42
 const HEADER_HEIGHT = 28
 
+// Priority → bar saturation ladder. Legend swatches read the SAME values
+// (legend = ground truth). high keeps the status color untouched; medium is
+// slightly grayer; low is clearly gray. Lightness compensates with S so bars
+// never glow pale-gray in dark mode.
+const PRIORITY_SATURATIONS: Record<ProjectPriority, number> = { high: 100, medium: 72, low: 45 }
+const LEGEND_SATURATIONS = [PRIORITY_SATURATIONS.high, PRIORITY_SATURATIONS.medium, PRIORITY_SATURATIONS.low]
+
 // Parse a YYYY-MM-DD string as a local-date midnight (not UTC)
 function localDate(str: string): Date {
   const [y, m, d] = str.split('-').map(Number)
   return new Date(y, m - 1, d)
+}
+
+/** Convert #RRGGBB → [h, s, l] (each %). */
+function hexToHsl(hex: string): [number, number, number] {
+  const r = parseInt(hex.slice(1, 3), 16) / 255
+  const g = parseInt(hex.slice(3, 5), 16) / 255
+  const b = parseInt(hex.slice(5, 7), 16) / 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b)
+  const l = (max + min) / 2
+  let h = 0, s = 0
+  if (max !== min) {
+    const d = max - min
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0))
+    else if (max === g) h = (b - r) / d + 2
+    else h = (r - g) / d + 4
+    h *= 60
+  }
+  return [Math.round(h), Math.round(s * 100), Math.round(l * 100)]
+}
+
+/** Desaturate a status color (S = target saturation %). Used for BOTH legend
+ *  swatches and (via PRIORITY_SATURATIONS) bar fills — legend = ground truth. */
+function desaturate(hexColor: string, s: number, dark: boolean): string {
+  if (s >= 100) return hexColor
+  const [h, , l0] = hexToHsl(hexColor)
+  const lightness = Math.round(dark ? Math.min(52, l0 * Math.sqrt(s / 100)) : 58 + (100 - s) * 0.075)
+  return `hsl(${h}, ${s}%, ${lightness}%)`
 }
 
 /** Group projects by parent */
@@ -46,6 +81,7 @@ interface DayHeader {
 function GanttPage() {
   const [theme] = useTheme()
   const dk = theme === 'dark'
+  const [colorByPriority, setColorByPriority] = useState(() => localStorage.getItem('kanban_color_by_priority') !== 'false')
   const navigate = useNavigate()
   const { projects, add, remove, moveProjectUp, moveProjectDown } = useProjects()
   const [milestones, setMilestones] = useState<Milestone[]>(() => projectStore.getMilestones())
@@ -144,20 +180,22 @@ function GanttPage() {
     return list
   }, [projects, searchQuery, statusFilter, priorityFilter, selectedTags])
 
-  const filteredGroups = useMemo(() => {
-    const filteredIds = new Set(filteredList.map(p => p.id))
-    const filteredRoots = filteredList.filter(p => p.parent_id === null && filteredIds.has(p.id))
+  const buildGroups = (list: typeof filteredList) => {
+    const filteredIds = new Set(list.map(p => p.id))
+    const filteredRoots = list.filter(p => p.parent_id === null && filteredIds.has(p.id))
     // Sort root projects by sort_order ascending
     filteredRoots.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-    const groups: { projectId: string; subProjects: Project[] }[] = []
+    const groups: { projectId: string; subProjects: typeof filteredList }[] = []
     for (const root of filteredRoots) {
-      const subs = filteredList.filter(p => p.parent_id === root.id)
+      const subs = list.filter(p => p.parent_id === root.id)
       // Sort sub-projects by sort_order ascending
       subs.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       groups.push({ projectId: root.id, subProjects: subs })
     }
     return groups
-  }, [filteredList])
+  }
+
+  const filteredGroups = useMemo(() => buildGroups(filteredList), [filteredList])
 
   const allTags = useMemo(() => {
     const tagSet = new Set<string>()
@@ -376,7 +414,7 @@ function GanttPage() {
     return idx >= 0 ? idx * DAY_WIDTH : 0
   }, [dateHeaders])
 
-  // Status colors
+  // Status colors (full saturation = high priority)
   const statusColorMap: Record<string, string> = {
     preparation: '#FBBF24',
     in_progress: '#3B82F6',
@@ -481,7 +519,6 @@ function GanttPage() {
       const isRootLast = rootIdx === totalRoots - 1
       const isExpanded = expandedParents.has(group.projectId)
 
-      // Root row with arrows based on position among all roots
       rows.push({
         project: rootProject, isRoot: true, groupId: group.projectId,
         isFirstSibling: isRootFirst, isLastSibling: isRootLast,
@@ -517,7 +554,8 @@ function GanttPage() {
     return Math.max(height, 200)
   }, [filteredGroups, expandedParents])
 
-  // Build SVG rows with y-offsets
+  // ── SVG rows (y accumulates top-down, sidebar-compatible — change height math
+  //    in BOTH this memo and totalGanttHeight together to keep left/right lockstep) ──
   const svgRows = useMemo(() => {
     const rows: Array<{ project: Project; isRoot: boolean; y: number; h: number; groupId: string; milestoneChildren?: Project[] }> = []
     let y = HEADER_HEIGHT + MILESTONE_ROW_HEIGHT
@@ -547,6 +585,7 @@ function GanttPage() {
 
   // ── Gantt bar render helper ──
   const renderBar = (project: Project, yPos: number, rowHeight: number) => {
+    const baseColor = statusColorMap[project.status] || '#3B82F6'
     const startMs = localDate(project.start_date).getTime()
     const endMs = localDate(project.end_date).getTime()
     const viewStartMs = localDate(viewStart).getTime()
@@ -574,7 +613,7 @@ function GanttPage() {
           width={barWidth}
           height={barH}
           rx={3} ry={3}
-          fill={statusColorMap[project.status] || '#3B82F6'}
+          fill={colorByPriority ? desaturate(baseColor, PRIORITY_SATURATIONS[project.priority] ?? 100, dk) : baseColor}
           onClick={() => handleProjectClick(project.id)}
           style={{ pointerEvents: 'auto', cursor: 'pointer' }}
         />
@@ -702,13 +741,45 @@ function GanttPage() {
             </div>
           )}
           <div className="flex items-center gap-3 ml-auto">
-            <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-yellow-400"></span>準備中</span>
-            <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-blue-500"></span>進行中</span>
-            <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-orange-400"></span>等待中</span>
-            <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-green-500"></span>已完成</span>
-          </div>
+            <label className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 cursor-pointer select-none" title="開啟後依優先級降低色塊飽和度（高=不變、中=偏灰、低=更淡灰）；關閉 = 色塊飽和度只由狀態決定（維持舊行為）">
+              <input
+                type="checkbox"
+                checked={colorByPriority}
+                onChange={e => {
+                  setColorByPriority(e.target.checked)
+                  localStorage.setItem('kanban_color_by_priority', String(e.target.checked))
+                  window.dispatchEvent(new CustomEvent('kanban:filter-change'))
+                }}
+                className="w-3.5 h-3.5 accent-blue-500"
+              />
+              優先級調色
+            </label>
+            {!colorByPriority && (
+              <>
+                <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-yellow-400"></span>準備中</span>
+                <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-blue-500"></span>進行中</span>
+                <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-orange-400"></span>等待中</span>
+                <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-green-500"></span>已完成</span>
+              </>
+            )}
         </div>
-      </div>
+
+        {/* Priority legend (mutually exclusive with status legend above): same saturations as rendered bars */}
+        {colorByPriority && (
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-xs text-gray-500 dark:text-gray-400">優先級（飽和度 高→低）：</span>
+            {([['#3B82F6', '進行中'], ['#F97316', '等待中'], ['#10B981', '已完成']] as const).map(([hex, label]) => (
+              <span key={hex} className="flex items-center gap-1 text-xs">
+                <span className="flex gap-px">
+                  {LEGEND_SATURATIONS.map(s => (
+                    <span key={s} className="w-2.5 h-3 rounded-sm inline-block" style={{ backgroundColor: desaturate(hex, s, dk) }} />
+                  ))}
+                </span>
+                {label}
+              </span>
+            ))}
+          </div>
+        )}      </div>
 
       {/* Gantt Chart — frozen sidebar + scrollable right */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -960,7 +1031,7 @@ function GanttPage() {
                           x={cx - 4} y={cy - 4}
                           width={8} height={8} rx={1.5}
                           transform={`rotate(45 ${cx} ${cy})`}
-                          fill={statusColorMap[mc.status] || '#3B82F6'}
+                          fill={colorByPriority ? desaturate(statusColorMap[mc.status] || '#3B82F6', PRIORITY_SATURATIONS[mc.priority] ?? 100, dk) : (statusColorMap[mc.status] || '#3B82F6')}
                           stroke={dk ? '#111827' : '#ffffff'}
                           strokeWidth={1}
                           opacity={0.95}
