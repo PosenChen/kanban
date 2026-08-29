@@ -762,6 +762,7 @@ function GanttPage() {
                 <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-green-500"></span>已完成</span>
               </>
             )}
+          </div>
         </div>
 
         {/* Priority legend (mutually exclusive with status legend above): same saturations as rendered bars */}
