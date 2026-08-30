@@ -5,6 +5,7 @@ import { projectStore, setStorageSource, isColorByPriority, STORAGE_KEY_COLOR_BY
 import { STATUS_CONFIG, type Project, type Milestone, type Todo, type ProjectPriority } from '@/types/project'
 import { dateToStr } from '@/utils/dateUtils'
 import { useTheme } from '@/utils/theme'
+import ProjectForm from '@/components/ProjectForm'
 
 // ── Constants ──
 const DAY_WIDTH = 24      // 1 day = 24px
@@ -316,6 +317,8 @@ function GanttPage() {
   }, [editingTodo])
 
   // ── Activity add/edit modal ──
+  const [showProjectForm, setShowProjectForm] = useState(false)
+  const rootProjects = useMemo(() => projects.filter(p => p.parent_id === null), [projects])
   const [showActivityModal, setShowActivityModal] = useState(false)
   const [editingActivity, setEditingActivity] = useState<Milestone | null>(null)
   const [activityName, setActivityName] = useState('')
@@ -479,19 +482,22 @@ function GanttPage() {
   }, [navigate, projects])
 
   const handleAdd = useCallback(() => {
-    const now = new Date().toISOString().split('T')[0]
-    add({
-      name: '新專案',
-      description: '',
-      parent_id: null,
-      sort_order: 0,
-      start_date: now,
-      end_date: dateToStr(new Date(new Date(now).getTime() + 7 * 86400000)),
-      status: 'preparation',
-      priority: 'medium',
-      tags: [],
-      progress: 0,
-    })
+    setShowProjectForm(true)
+  }, [])
+
+  const handleCreateProject = useCallback((data: Omit<Project, 'id' | 'created_at' | 'updated_at'>) => {
+    add(data)
+    // Sub-project just created → expand its parent so it's immediately visible on the chart
+    if (data.parent_id) {
+      setExpandedParents(prev => {
+        if (prev.has(data.parent_id as string)) return prev
+        const next = new Set(prev)
+        next.add(data.parent_id as string)
+        try { localStorage.setItem('kanban_expanded', JSON.stringify([...next])) } catch { /* ignore */ }
+        return next
+      })
+    }
+    setShowProjectForm(false)
   }, [add])
 
   const handleDelete = useCallback((id: string) => {
@@ -1321,6 +1327,16 @@ function GanttPage() {
             </div>
           </div>
         </div>
+      )}
+      {/* Add-project modal (＋新增) */}
+      {showProjectForm && (
+        <ProjectForm
+          onClose={() => setShowProjectForm(false)}
+          onSubmit={handleCreateProject}
+          rootProjects={rootProjects}
+          defaultStartDate={dateToStr(new Date())}
+          defaultEndDate={dateToStr(new Date(Date.now() + 7 * 86400000))}
+        />
       )}
     </div>
   )

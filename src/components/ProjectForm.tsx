@@ -8,14 +8,16 @@ interface ProjectFormProps {
   onSubmit: (data: Omit<Project, 'id' | 'created_at' | 'updated_at'>) => void
   editProject?: Project | null
   rootProjects: Project[]
+  defaultStartDate?: string
+  defaultEndDate?: string
 }
 
-function ProjectForm({ onClose, onSubmit, editProject, rootProjects }: ProjectFormProps) {
+function ProjectForm({ onClose, onSubmit, editProject, rootProjects, defaultStartDate, defaultEndDate }: ProjectFormProps) {
   const [name, setName] = useState(editProject?.name || '')
   const [description, setDescription] = useState(editProject?.description || '')
   const [parentId, setParentId] = useState(editProject?.parent_id || '')
-  const [startDate, setStartDate] = useState(editProject?.start_date || '')
-  const [endDate, setEndDate] = useState(editProject?.end_date || '')
+  const [startDate, setStartDate] = useState(editProject?.start_date || defaultStartDate || '')
+  const [endDate, setEndDate] = useState(editProject?.end_date || defaultEndDate || '')
   const [status, setStatus] = useState<ProjectStatus>(editProject?.status || 'preparation')
   const [priority, setPriority] = useState<'high' | 'medium' | 'low'>(editProject?.priority || 'medium')
   const [tagInput, setTagInput] = useState('')
@@ -78,6 +80,7 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects }: ProjectFo
               className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
               placeholder="輸入專案名稱"
               required
+              autoFocus
             />
           </div>
 
