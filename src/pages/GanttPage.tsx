@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
 import { projectStore, setStorageSource, isColorByPriority, STORAGE_KEY_COLOR_BY_PRIORITY } from '@/data/localStorageStore'
@@ -62,6 +62,27 @@ function desaturate(hexColor: string, s: number, dark: boolean): string {
   return `hsl(${h}, ${s}%, ${lightness}%)`
 }
 
+// ── Drag-to-edit dates helpers ──
+const addDays = (dateStr: string, n: number): string =>
+  dateToStr(new Date(localDate(dateStr).getTime() + n * 86400000))
+
+/** pointer clientX → fractional day index in SVG scroll space */
+function pxToDay(clientX: number, svgRect: DOMRect, scrollLeft: number): number {
+  return (clientX - svgRect.left + scrollLeft) / DAY_WIDTH
+}
+
+type DragKind = 'move' | 'resize-l' | 'resize-r'
+interface DragState {
+  kind: DragKind
+  target: 'project' | 'milestone'
+  id: string
+  origX: number; origW: number
+  newX: number; newW: number
+  barY: number; barH: number      // ghost geometry passthrough
+  grabbedDay: number
+  moved: boolean                   // crossed 4px threshold → suppress trailing click
+}
+
 /** Group projects by parent */
 function buildRowGroups(projects: Project[]): { projectId: string; subProjects: Project[] }[] {
   const roots = projects.filter(p => p.parent_id === null)
@@ -87,7 +108,7 @@ function GanttPage() {
   const dk = theme === 'dark'
   const [colorByPriority, setColorByPriority] = useState(isColorByPriority)
   const navigate = useNavigate()
-  const { projects, add, remove, moveProjectUp, moveProjectDown } = useProjects()
+  const { projects, add, update, remove, moveProjectUp, moveProjectDown } = useProjects()
   const [milestones, setMilestones] = useState<Milestone[]>(() => projectStore.getMilestones())
 
   const rowGroups = useMemo(() => buildRowGroups(projects), [projects])
@@ -316,6 +337,55 @@ function GanttPage() {
     setEditingTodo(null)
   }, [editingTodo])
 
+  // ── Drag-to-edit dates ──
+  const [drag, setDrag] = useState<DragState | null>(null)
+  const svgRef = useRef<SVGSVGElement | null>(null)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const suppressClickRef = useRef(false)
+
+  const startDrag = useCallback((e: React.PointerEvent, opts: { kind: DragKind; target: 'project' | 'milestone'; id: string; x: number; w: number; y: number; h: number }) => {
+    if (e.button !== 0) return
+    e.stopPropagation()
+    try { (e.currentTarget as Element).setPointerCapture?.(e.pointerId) } catch { /* pointer may be stale — drag still works via svg handlers */ }
+    const svg = svgRef.current, sc = scrollRef.current
+    const grabbedDay = svg && sc ? pxToDay(e.clientX, svg.getBoundingClientRect(), sc.scrollLeft) : 0
+    setDrag({ kind: opts.kind, target: opts.target, id: opts.id, origX: opts.x, origW: opts.w, newX: opts.x, newW: opts.w, barY: opts.y, barH: opts.h, grabbedDay, moved: false })
+  }, [])
+
+  // totalWidth mirror for handler clamps (handlers are stable; view range changes)
+  const totalWidthRef = useRef(0)
+
+  const onSvgPointerMove = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+    if (!drag) return
+    const svg = svgRef.current, sc = scrollRef.current
+    if (!svg || !sc) return
+    const day = pxToDay(e.clientX, svg.getBoundingClientRect(), sc.scrollLeft)
+    const rawDelta = (day - drag.grabbedDay) * DAY_WIDTH
+    const delta = Math.round(rawDelta / DAY_WIDTH) * DAY_WIDTH
+    if (!drag.moved && Math.abs(rawDelta) < 4) return
+    let newX = drag.newX, newW = drag.newW
+    if (drag.kind === 'move') newX = Math.min(Math.max(0, drag.origX + delta), totalWidthRef.current - drag.origW)
+    else if (drag.kind === 'resize-l') {
+      newX = Math.min(Math.max(0, drag.origX + delta), drag.origX + drag.origW - DAY_WIDTH)
+      newW = drag.origW + (drag.origX - newX)
+    } else {
+      newW = Math.min(Math.max(DAY_WIDTH, drag.origW + delta), totalWidthRef.current - drag.origX)
+    }
+    if (newX !== drag.newX || newW !== drag.newW || drag.moved) setDrag({ ...drag, newX, newW, moved: true })
+  }, [drag])
+
+  const onSvgPointerUp = useCallback(() => {
+    if (!drag) return
+    if (drag.moved) {
+      const s = addDays(viewStart, Math.round(drag.newX / DAY_WIDTH))
+      const en = addDays(viewStart, Math.round((drag.newX + drag.newW) / DAY_WIDTH) - 1)
+      if (drag.target === 'project') update(drag.id, { start_date: s, end_date: en })
+      else projectStore.updateMilestone(drag.id, { start_date: s, end_date: en })
+      suppressClickRef.current = true
+    }
+    setDrag(null)
+  }, [drag, viewStart, update])
+
   // ── Activity add/edit modal ──
   const [showProjectForm, setShowProjectForm] = useState(false)
   const rootProjects = useMemo(() => projects.filter(p => p.parent_id === null), [projects])
@@ -339,6 +409,7 @@ function GanttPage() {
   }, [])
 
   const openEditActivity = useCallback((m: Milestone) => {
+    if (suppressClickRef.current) { suppressClickRef.current = false; return }
     setEditingActivity(m)
     setActivityName(m.name)
     setActivityStartDate(m.start_date)
@@ -412,6 +483,7 @@ function GanttPage() {
   }, [viewStart, projects])
 
   const totalWidth = dateHeaders.length * DAY_WIDTH
+  totalWidthRef.current = totalWidth
 
   // Today offset relative to viewStart (day 0 = viewStart)
   const todayOffset = useMemo(() => {
@@ -476,6 +548,7 @@ function GanttPage() {
   }, [navigate])
 
   const handleProjectClick = useCallback((id: string) => {
+    if (suppressClickRef.current) { suppressClickRef.current = false; return }
     const project = projects.find(p => p.id === id)
     console.log('[handleProjectClick] ID:', id, 'projectName:', project?.name, 'currentUrl:', window.location.href)
     navigate(`/project/${id}`)
@@ -624,7 +697,8 @@ function GanttPage() {
           rx={3} ry={3}
           fill={colorByPriority ? desaturate(baseColor, PRIORITY_SATURATIONS[project.priority] ?? 100, dk) : baseColor}
           onClick={() => handleProjectClick(project.id)}
-          style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+          onPointerDown={e => startDrag(e, { kind: 'move', target: 'project', id: project.id, x, w: barWidth, y: barY, h: barH })}
+          style={{ pointerEvents: 'auto', cursor: drag?.id === project.id ? 'grabbing' : 'grab', touchAction: 'none' }}
         />
         <text
           x={x + (narrowBar ? 3 : 6)}
@@ -637,6 +711,17 @@ function GanttPage() {
             ? project.name.slice(0, 2)
             : (project.name.length > 6 ? project.name.slice(0, 6) + '…' : project.name)}
         </text>
+        {/* edge handles — resize start / end date (rendered last = on top) */}
+        <rect
+          x={x - 4} y={barY} width={8} height={barH} fill="transparent"
+          onPointerDown={e => startDrag(e, { kind: 'resize-l', target: 'project', id: project.id, x, w: barWidth, y: barY, h: barH })}
+          style={{ cursor: 'ew-resize', pointerEvents: 'auto', touchAction: 'none' }}
+        />
+        <rect
+          x={x + barWidth - 4} y={barY} width={8} height={barH} fill="transparent"
+          onPointerDown={e => startDrag(e, { kind: 'resize-r', target: 'project', id: project.id, x, w: barWidth, y: barY, h: barH })}
+          style={{ cursor: 'ew-resize', pointerEvents: 'auto', touchAction: 'none' }}
+        />
       </g>
     )
   }
@@ -917,11 +1002,15 @@ function GanttPage() {
           </div>
 
           {/* ══════════ SCROLLABLE RIGHT AREA (SVG) ══════════ */}
-          <div className="absolute left-[96px] top-0 right-0 overflow-x-auto overflow-y-hidden">
+          <div className="absolute left-[96px] top-0 right-0 overflow-x-auto overflow-y-hidden" ref={scrollRef}>
             <svg
+              ref={svgRef}
               width={totalWidth}
               height={totalGanttHeight + HEADER_HEIGHT}
               className="min-w-full"
+              onPointerMove={onSvgPointerMove}
+              onPointerUp={onSvgPointerUp}
+              onPointerCancel={onSvgPointerUp}
             >
               {/* Date header background */}
               <rect x={0} y={0} width={totalWidth} height={HEADER_HEIGHT} fill={dk ? '#1f2937' : '#f9fafb'} />
@@ -996,8 +1085,20 @@ function GanttPage() {
                       width={Math.max(mWidth - 4, 20)} height={20} rx={4}
                       fill={`hsl(${hue}, 65%, 65%)`} opacity={0.85}
                       stroke={`hsl(${hue}, 65%, 50%)`} strokeWidth={0.5}
-                      className="cursor-pointer"
                       onClick={() => openEditActivity(m)}
+                      onPointerDown={e => startDrag(e, { kind: 'move', target: 'milestone', id: m.id, x: mX + 2, w: Math.max(mWidth - 4, 20), y: HEADER_HEIGHT + 4, h: 20 })}
+                      style={{ cursor: drag?.id === m.id ? 'grabbing' : 'grab', touchAction: 'none' }}
+                    />
+                    {/* edge handles — resize activity dates */}
+                    <rect
+                      x={mX - 2} y={HEADER_HEIGHT + 4} width={8} height={20} fill="transparent"
+                      onPointerDown={e => startDrag(e, { kind: 'resize-l', target: 'milestone', id: m.id, x: mX + 2, w: Math.max(mWidth - 4, 20), y: HEADER_HEIGHT + 4, h: 20 })}
+                      style={{ cursor: 'ew-resize', pointerEvents: 'auto', touchAction: 'none' }}
+                    />
+                    <rect
+                      x={mX + 2 + Math.max(mWidth - 4, 20) - 4} y={HEADER_HEIGHT + 4} width={8} height={20} fill="transparent"
+                      onPointerDown={e => startDrag(e, { kind: 'resize-r', target: 'milestone', id: m.id, x: mX + 2, w: Math.max(mWidth - 4, 20), y: HEADER_HEIGHT + 4, h: 20 })}
+                      style={{ cursor: 'ew-resize', pointerEvents: 'auto', touchAction: 'none' }}
                     />
                     {/* Activity name label on the bar */}
                     {/* Activity name: full-ish label when wide, first 2 chars on 1-day (narrow) bars */}
@@ -1067,6 +1168,24 @@ function GanttPage() {
                 stroke="#ef4444" strokeWidth={2}
                 pointerEvents="none"
               />
+
+              {/* Drag ghost — snapped preview with date range tooltip */}
+              {drag && drag.moved && (
+                <g pointerEvents="none">
+                  <rect
+                    x={drag.newX} y={drag.barY} width={drag.newW} height={drag.barH} rx={3}
+                    fill={dk ? '#60a5fa' : '#3b82f6'} opacity={0.35}
+                    stroke="#2563eb" strokeWidth={1} strokeDasharray="4 2"
+                  />
+                  <text
+                    x={drag.newX + 4} y={drag.barY + 11}
+                    fontSize="8" fontWeight="600"
+                    fill={dk ? '#bfdbfe' : '#1d4ed8'}
+                  >
+                    {`${addDays(viewStart, Math.round(drag.newX / DAY_WIDTH))} ~ ${addDays(viewStart, Math.round((drag.newX + drag.newW) / DAY_WIDTH) - 1)}`}
+                  </text>
+                </g>
+              )}
 
             </svg>
           </div>
