@@ -1,4 +1,4 @@
-import type { Project, Milestone, Todo } from '@/types/project'
+import type { Project, Milestone, Todo, Routine } from '@/types/project'
 import { SAMPLE_PROJECTS_WITH_META } from './sampleData'
 import { dateToStr, formatDate } from '@/utils/dateUtils'
 
@@ -8,6 +8,7 @@ const STORAGE_KEY_TODOS = 'kanban_todos'
 const STORAGE_KEY_TOKEN = 'kanban_github_token'
 const STORAGE_KEY_SOURCE = 'kanban_storage_source'
 export const STORAGE_KEY_COLOR_BY_PRIORITY = 'kanban_color_by_priority'
+const STORAGE_KEY_ROUTINES = 'kanban_routines'
 
 /** Default ON unless the user explicitly turned it off ('false'). */
 export function isColorByPriority(): boolean {
@@ -17,6 +18,7 @@ export function isColorByPriority(): boolean {
 const GITHUB_PROJECTS_PATH = 'data/projects.json'
 const GITHUB_MILESTONES_PATH = 'data/milestones.json'
 const GITHUB_TODOS_PATH = 'data/todos.json'
+const GITHUB_ROUTINES_PATH = 'data/routines.json'
 
 // ── Milestone local storage ──
 
@@ -48,6 +50,22 @@ function loadTodos(): Todo[] {
 
 function saveTodos(todos: Todo[]): void {
   localStorage.setItem(STORAGE_KEY_TODOS, JSON.stringify(todos))
+}
+
+// ── Routine local storage ──
+
+function loadRoutines(): Routine[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_ROUTINES)
+    if (!raw) return []
+    return JSON.parse(raw) as Routine[]
+  } catch {
+    return []
+  }
+}
+
+function saveRoutines(routines: Routine[]): void {
+  localStorage.setItem(STORAGE_KEY_ROUTINES, JSON.stringify(routines))
 }
 
 // ── LocalStorage (always active) ──
@@ -135,13 +153,15 @@ export async function readGitHub(token: string): Promise<Project[]> {
   return readGitHubFile(token, GITHUB_PROJECTS_PATH) as Promise<Project[]>
 }
 
-export async function writeGitHub(token: string, projects: Project[], milestones: Milestone[], todos: Todo[]): Promise<void> {
+export async function writeGitHub(token: string, projects: Project[], milestones: Milestone[], todos: Todo[], routines: Routine[]): Promise<void> {
   // Write projects
   await writeGitHubFile(token, GITHUB_PROJECTS_PATH, projects)
   // Write milestones
   await writeGitHubFile(token, GITHUB_MILESTONES_PATH, milestones)
   // Write todos
   await writeGitHubFile(token, GITHUB_TODOS_PATH, todos)
+  // Write routines
+  await writeGitHubFile(token, GITHUB_ROUTINES_PATH, routines)
 }
 
 export async function readMilestonesGitHub(token: string): Promise<Milestone[]> {
@@ -152,11 +172,16 @@ export async function readTodosGitHub(token: string): Promise<Todo[]> {
   return readGitHubFile(token, GITHUB_TODOS_PATH) as Promise<Todo[]>
 }
 
+export async function readRoutinesGitHub(token: string): Promise<Routine[]> {
+  return readGitHubFile(token, GITHUB_ROUTINES_PATH) as Promise<Routine[]>
+}
+
 // ── Unified store ──
 
 let cached: Project[] = []
 let milestones: Milestone[] = []
 let todos: Todo[] = []
+let routines: Routine[] = loadRoutines()
 
 // Load milestones
 milestones = loadMilestones()
@@ -301,6 +326,10 @@ function emitMilestoneChange() {
 
 function emitTodoChange() {
   window.dispatchEvent(new CustomEvent('kanban:todo-change', { detail: todos }))
+}
+
+function emitRoutineChange() {
+  window.dispatchEvent(new CustomEvent('kanban:routine-change', { detail: routines }))
 }
 
 export const projectStore = {
@@ -636,6 +665,53 @@ export const projectStore = {
     return true
   },
 
+  // ── Routine (流水帳) CRUD ──
+
+  addRoutine(data: Omit<Routine, 'id' | 'created_at' | 'updated_at' | 'sort_order'>): Routine {
+    const now = new Date().toISOString()
+    const newRoutine: Routine = {
+      ...data,
+      sort_order: routines.length,
+      id: `ro${Date.now().toString(36)}`,
+      created_at: now,
+      updated_at: now,
+    }
+    routines = [...routines, newRoutine]
+    saveRoutines(routines)
+    emitRoutineChange()
+    return newRoutine
+  },
+
+  getRoutines(): Routine[] {
+    return routines
+  },
+
+  updateRoutine(id: string, updates: Partial<Routine>): Routine | undefined {
+    const idx = routines.findIndex(r => r.id === id)
+    if (idx === -1) return undefined
+    const updated = { ...routines[idx], ...updates, updated_at: new Date().toISOString() }
+    routines[idx] = updated
+    saveRoutines(routines)
+    emitRoutineChange()
+    return updated
+  },
+
+  removeRoutine(id: string): boolean {
+    const idx = routines.findIndex(r => r.id === id)
+    if (idx === -1) return false
+    routines = routines.filter(r => r.id !== id)
+    saveRoutines(routines)
+    emitRoutineChange()
+    return true
+  },
+
+  /** 勾選/取消勾選（today=YYYY-MM-DD；隔天 completed_date 比對自然失效） */
+  toggleRoutineDone(id: string, today: string): void {
+    const r = routines.find(x => x.id === id)
+    if (!r) return
+    this.updateRoutine(id, { completed_date: r.completed_date === today ? undefined : today })
+  },
+
   // 📥 手動從 GitHub 讀取資料
   async loadFromGitHub(token: string): Promise<Project[]> {
     const projects = await readGitHub(token)
@@ -687,6 +763,17 @@ export const projectStore = {
       saveTodos(todos)
       emitTodoChange()
 
+      // Load routines from GitHub
+      const loadedRoutines = await readRoutinesGitHub(token)
+      const existingRoutineIds = new Set(routines.map(r => r.id))
+      for (const r of loadedRoutines) {
+        if (!existingRoutineIds.has(r.id)) {
+          routines.push(r)
+        }
+      }
+      saveRoutines(routines)
+      emitRoutineChange()
+
       emitProjectChange()
       setStorageSource('github')
       return cached
@@ -711,9 +798,11 @@ export const projectStore = {
     cached = loadLocal()
     milestones = loadMilestones()
     todos = loadTodos()
+    routines = loadRoutines()
     emitProjectChange()
     emitMilestoneChange()
     emitTodoChange()
+    emitRoutineChange()
   },
 }
 
@@ -730,6 +819,10 @@ window.addEventListener('storage', (e) => {
     todos = loadTodos()
     emitTodoChange()
   }
+  if (e.key === STORAGE_KEY_ROUTINES) {
+    routines = loadRoutines()
+    emitRoutineChange()
+  }
 })
 
 // ── GitHub sync (debounced 3s) ──
@@ -742,7 +835,7 @@ export function scheduleGitHubSync(token: string | null, force: boolean = false)
 
   syncTimer = setTimeout(async () => {
     try {
-      await writeGitHub(token.trim(), cached, milestones, todos)
+      await writeGitHub(token.trim(), cached, milestones, todos, routines)
       console.log('✅ Synced to GitHub')
     } catch (err: unknown) {
       console.warn('GitHub sync failed:', err)
