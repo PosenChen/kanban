@@ -70,3 +70,20 @@ export interface Todo {
 
 // Quick-pick tags offered as one-tap buttons in project & activity forms
 export const QUICK_TAGS: string[] = ['工作', '採購', '上課', '會議', '研究', '考試']
+
+// ── Daily Routine (流水帳) ──
+// 觸發語意（使用者確認）：同一維度內 OR、跨維度 OR、全空條件 = 不出現
+export interface Routine {
+  id: string
+  name: string
+  weekdays: number[]      // 0=日 1=一 ... 6=六
+  monthDays: number[]     // 1..31
+  tags: string[]          // 今日活動（milestone）含任一標籤即觸發
+  sort_order: number
+  completed_date?: string // YYYY-MM-DD，最後勾選日；隔天自動失效
+  created_at: string
+  updated_at: string
+}
+
+// 星期顯示（index 0..6）
+export const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
