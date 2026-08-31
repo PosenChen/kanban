@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "VITE_CONFIG_NATIVE_IGNORE_WARNING=true vite",
     "build": "VITE_CONFIG_NATIVE_IGNORE_WARNING=true tsc && VITE_CONFIG_NATIVE_IGNORE_WARNING=true vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -25,6 +26,7 @@
     "postcss": "^8.5.26",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "vitest": "^3.0.0"
   }
 }
