@@ -94,19 +94,18 @@ export function buildWordHtml(root: Project, subtree: Project[]): string {
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const statusLabel: Record<string, string> = { preparation: '準備中', waiting: '等待中', in_progress: '進行中', completed: '已完成' }
   const prioLabel: Record<string, string> = { high: '高', medium: '中', low: '低' }
-  // 深度縮排：根 0、直接子 1、孫 2...
+  // 深度縮排：根 0、直接子 1、孫 2...（往上數到根）
   const depthOf = (id: string): number => {
     let d = 0
     let cur = subtree.find(p => p.id === id)
-    while (cur && cur.parent_id && cur.parent_id !== root.id) {
+    while (cur && cur.parent_id) {
       d++
       cur = subtree.find(p => p.id === cur!.parent_id)
     }
-    if (cur && cur.id !== root.id && cur.parent_id === root.id) d++
     return d
   }
   const rows = subtree.map(p => {
-    const indent = p.id === root.id ? '<b>' : '　'.repeat(depthOf(p))
+    const indent = p.id === root.id ? '<b>' : '　'.repeat(depthOf(p.id))
     const close = p.id === root.id ? '</b>' : ''
     return `<tr><td>${indent}${esc(p.name)}${close}</td><td>${p.start_date}</td><td>${p.end_date}</td><td>${p.progress}%</td><td>${prioLabel[p.priority] || p.priority}</td><td>${statusLabel[p.status] || p.status}</td></tr>`
   }).join('\n      ')
