@@ -1,6 +1,7 @@
 import type { Project, Milestone, Todo, Routine } from '@/types/project'
 import { SAMPLE_PROJECTS_WITH_META } from './sampleData'
 import { dateToStr, formatDate } from '@/utils/dateUtils'
+import { remapAndShift, type ProjectTemplate } from '@/utils/exportUtils'
 
 const STORAGE_KEY_DATA = 'kanban_projects'
 const STORAGE_KEY_MILESTONES = 'kanban_milestones'
@@ -663,6 +664,20 @@ export const projectStore = {
     saveTodos(todos)
     emitTodoChange()
     return true
+  },
+
+  /** 匯入專案模板：新 ID、日期重錨定今日、附加到現有資料尾端 */
+  importTemplate(t: ProjectTemplate): Project[] {
+    const newProjects = remapAndShift(t)
+    const maxSort = cached.reduce((m, p) => Math.max(m, p.sort_order ?? 0), -1)
+    let rootIdx = 0
+    newProjects.forEach(p => {
+      if (p.parent_id === null) { p.sort_order = maxSort + 1 + (rootIdx++) }
+    })
+    cached = [...cached, ...newProjects]
+    saveLocal(cached)
+    emitProjectChange()
+    return newProjects
   },
 
   // ── Routine (流水帳) CRUD ──
