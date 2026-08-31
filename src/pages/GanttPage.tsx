@@ -273,6 +273,11 @@ function GanttPage() {
     return [...todos].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
   }, [todos])
 
+  // Todos respect the same priority filter as the Gantt projects
+  const visibleTodos = useMemo(() => {
+    return priorityFilter ? sortedTodos.filter(t => t.priority === priorityFilter) : sortedTodos
+  }, [sortedTodos, priorityFilter])
+
   const openAddTodo = useCallback(() => {
     setEditingTodo(null)
     setTodoName('')
@@ -1205,19 +1210,23 @@ function GanttPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
             </svg>
             待辦事項
-            {sortedTodos.length > 0 && (
+            {visibleTodos.length > 0 && (
               <span className="bg-teal-100 dark:bg-teal-900 text-teal-700 dark:text-teal-300 px-2 py-0.5 rounded-full text-xs">
-                {sortedTodos.filter(t => !t.completed).length}/{sortedTodos.length}
+                {visibleTodos.filter(t => !t.completed).length}/{visibleTodos.length}
               </span>
             )}
           </h2>
         </div>
 
-        {sortedTodos.length === 0 ? (
-          <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">還沒有待辦事項，點擊上方「待辦」按鈕新增</p>
+        {visibleTodos.length === 0 ? (
+          <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">
+            {priorityFilter && sortedTodos.length > 0
+              ? `目前篩選條件下沒有${priorityFilter === 'high' ? '高' : priorityFilter === 'medium' ? '中' : '低'}優先級待辦事項`
+              : '還沒有待辦事項，點擊上方「待辦」按鈕新增'}
+          </p>
         ) : (
           <div className="space-y-2">
-            {sortedTodos.map(todo => (
+            {visibleTodos.map(todo => (
               <div
                 key={todo.id}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors ${
@@ -1265,9 +1274,9 @@ function GanttPage() {
                   {todo.priority === 'high' ? '高' : todo.priority === 'medium' ? '中' : '低'}
                 </span>
 
-                {/* Reorder arrows — first: only ▼, last: only ▲, middle: both */}
+                {/* Reorder arrows — first: only ▼, last: only ▲, middle: both (relative to visible list) */}
                 <div className="flex flex-col gap-0 pointer-events-auto">
-                  {sortedTodos.indexOf(todo) > 0 && (
+                  {visibleTodos.indexOf(todo) > 0 && (
                     <span
                       className="cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-900 w-[12px] h-[8px] flex items-center justify-center text-[6px] text-gray-400 dark:text-gray-500 hover:text-blue-600"
                       onClick={(e) => { e.stopPropagation(); handleMoveTodoUp(todo.id) }}
@@ -1276,7 +1285,7 @@ function GanttPage() {
                       ▲
                     </span>
                   )}
-                  {sortedTodos.indexOf(todo) < sortedTodos.length - 1 && (
+                  {visibleTodos.indexOf(todo) < visibleTodos.length - 1 && (
                     <span
                       className="cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-900 w-[12px] h-[8px] flex items-center justify-center text-[6px] text-gray-400 dark:text-gray-500 hover:text-blue-600"
                       onClick={(e) => { e.stopPropagation(); handleMoveTodoDown(todo.id) }}
