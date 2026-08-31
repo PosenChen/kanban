@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { projectStore, scheduleGitHubSync, getSyncStatus, getStorageSource, setStorageSource } from '@/data/localStorageStore'
+import { isProjectTemplate } from '@/utils/exportUtils'
 
 function SettingsPage() {
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'loading' | 'success' | 'error'>('idle')
@@ -39,6 +40,16 @@ function SettingsPage() {
       reader.onload = () => {
         try {
           const data = JSON.parse(reader.result as string)
+          // 專案模板：偵測到 → 附加匯入（新 ID + 日期重錨定今日），不覆蓋現有資料
+          if (isProjectTemplate(data)) {
+            const roots = data.projects.filter(p => !p.parent_id).length
+            const msg = `匯入模板「${data.projects[0].name}」？\n共 ${data.projects.length} 個專案（頂層 ${roots} 個），日期將重錨定為今天起算。\n（附加到現有資料，不會覆蓋）`
+            if (!confirm(msg)) return
+            const added = projectStore.importTemplate(data)
+            alert(`已匯入 ${added.length} 個專案`)
+            window.location.reload()
+            return
+          }
           // Accept { projects: [...], milestones: [...], todos: [...] } or legacy plain [... ]
           const projects = Array.isArray(data.projects) ? data.projects : data
           if (projects.length > 0 && projects[0].id && projects[0].name) {
