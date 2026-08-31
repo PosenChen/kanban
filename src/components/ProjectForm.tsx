@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { STATUS_CONFIG, type Project, type ProjectStatus } from '@/types/project'
+import { STATUS_CONFIG, QUICK_TAGS, type Project, type ProjectStatus } from '@/types/project'
 import { PRIORITY_CONFIG } from '@/types/project'
 import { getRemainingDays, getDaysDiff } from '@/utils/dateUtils'
 
@@ -35,6 +35,11 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects, defaultStar
 
   const handleRemoveTag = (tag: string) => {
     setTags(tags.filter(t => t !== tag))
+  }
+
+  const handleToggleQuickTag = (tag: string) => {
+    if (tags.includes(tag)) setTags(tags.filter(t => t !== tag))
+    else setTags([...tags, tag])
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -187,6 +192,23 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects, defaultStar
               >
                 新增
               </button>
+            </div>
+            {/* Quick-pick tag buttons */}
+            <div className="flex flex-wrap gap-1 mt-2">
+              {QUICK_TAGS.map(tag => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => handleToggleQuickTag(tag)}
+                  className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${
+                    tags.includes(tag)
+                      ? 'bg-blue-500 text-white border-blue-500'
+                      : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-blue-400'
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))}
             </div>
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">

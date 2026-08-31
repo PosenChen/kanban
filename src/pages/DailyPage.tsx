@@ -324,7 +324,7 @@ function DailyPage() {
                 name: `今天新增的活動`,
                 start_date: targetDate,
                 end_date: targetDate,
-                tags: ['活動'],
+                tags: [],
                 description: '',
               })
               navigate('/')

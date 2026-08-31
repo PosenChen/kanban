@@ -67,3 +67,6 @@ export interface Todo {
   created_at: string
   updated_at: string
 }
+
+// Quick-pick tags offered as one-tap buttons in project & activity forms
+export const QUICK_TAGS: string[] = ['工作', '採購', '上課', '會議', '研究', '考試']

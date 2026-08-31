@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
 import { projectStore, setStorageSource, isColorByPriority, STORAGE_KEY_COLOR_BY_PRIORITY } from '@/data/localStorageStore'
-import { STATUS_CONFIG, type Project, type Milestone, type Todo, type ProjectPriority } from '@/types/project'
+import { STATUS_CONFIG, QUICK_TAGS, type Project, type Milestone, type Todo, type ProjectPriority } from '@/types/project'
 import { dateToStr } from '@/utils/dateUtils'
 import { useTheme } from '@/utils/theme'
 import ProjectForm from '@/components/ProjectForm'
@@ -399,7 +399,7 @@ function GanttPage() {
   const [activityName, setActivityName] = useState('')
   const [activityStartDate, setActivityStartDate] = useState(dateToStr(new Date()))
   const [activityEndDate, setActivityEndDate] = useState(dateToStr(new Date()))
-  const [activityTags, setActivityTags] = useState<string[]>(['活動'])
+  const [activityTags, setActivityTags] = useState<string[]>([])
   const [activityDesc, setActivityDesc] = useState('')
 
   const openAddActivity = useCallback(() => {
@@ -408,7 +408,7 @@ function GanttPage() {
     const today = dateToStr(new Date())
     setActivityStartDate(today)
     setActivityEndDate(today)
-    setActivityTags(['活動'])
+    setActivityTags([])
     setActivityDesc('')
     setShowActivityModal(true)
   }, [])
@@ -419,7 +419,7 @@ function GanttPage() {
     setActivityName(m.name)
     setActivityStartDate(m.start_date)
     setActivityEndDate(m.end_date || m.start_date)
-    setActivityTags(m.tags || ['活動'])
+    setActivityTags(m.tags || [])
     setActivityDesc(m.description || '')
     setShowActivityModal(true)
   }, [])
@@ -449,7 +449,7 @@ function GanttPage() {
     const today = dateToStr(new Date())
     setActivityStartDate(today)
     setActivityEndDate(today)
-    setActivityTags(['活動'])
+    setActivityTags([])
     setActivityDesc('')
     setShowActivityModal(false)
     setEditingActivity(null)
@@ -1349,6 +1349,23 @@ function GanttPage() {
                   className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm"
                   placeholder="例：招標、財務"
                 />
+                {/* Quick-pick tag buttons */}
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {QUICK_TAGS.map(tag => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => setActivityTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])}
+                      className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${
+                        activityTags.includes(tag)
+                          ? 'bg-purple-500 text-white border-purple-500'
+                          : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-purple-400'
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div>
                 <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">說明 / 備註</label>
