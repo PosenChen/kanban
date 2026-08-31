@@ -2,8 +2,9 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
 import { projectStore, setStorageSource, isColorByPriority, STORAGE_KEY_COLOR_BY_PRIORITY } from '@/data/localStorageStore'
-import { STATUS_CONFIG, QUICK_TAGS, type Project, type Milestone, type Todo, type ProjectPriority } from '@/types/project'
+import { STATUS_CONFIG, QUICK_TAGS, WEEKDAY_LABELS, type Project, type Milestone, type Todo, type ProjectPriority, type Routine } from '@/types/project'
 import { dateToStr } from '@/utils/dateUtils'
+import { getActiveRoutines, isDoneToday, todayStr } from '@/utils/routineUtils'
 import { useTheme } from '@/utils/theme'
 import ProjectForm from '@/components/ProjectForm'
 
@@ -250,6 +251,82 @@ function GanttPage() {
     window.addEventListener('kanban:milestone-change', handler)
     return () => window.removeEventListener('kanban:milestone-change', handler)
   }, [])
+
+  // ── Routine (流水帳) state ──
+  const [showRoutineModal, setShowRoutineModal] = useState(false)
+  const [routineEditMode, setRoutineEditMode] = useState(false)
+  const [showRoutineForm, setShowRoutineForm] = useState(false)
+  const [routines, setRoutines] = useState<Routine[]>(() => projectStore.getRoutines())
+  const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null)
+  const [rName, setRName] = useState('')
+  const [rWeekdays, setRWeekdays] = useState<number[]>([])
+  const [rMonthDays, setRMonthDays] = useState('')
+  const [rTags, setRTags] = useState<string[]>([])
+  const [rCustomTag, setRCustomTag] = useState('')
+
+  const today = todayStr()
+
+  // 今日進行中活動的標籤集合（供流水帳標籤條件比對）
+  const todayTags = useMemo(() => {
+    const s = new Set<string>()
+    milestones.forEach(m => {
+      if (m.start_date <= today && (m.end_date || m.start_date) >= today) m.tags.forEach(t => s.add(t))
+    })
+    return s
+  }, [milestones, today])
+
+  const activeRoutines = useMemo(
+    () => getActiveRoutines(routines, new Date(), todayTags),
+    [routines, todayTags],
+  )
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as Routine[] | undefined
+      if (detail) setRoutines([...detail])
+    }
+    window.addEventListener('kanban:routine-change', handler)
+    return () => window.removeEventListener('kanban:routine-change', handler)
+  }, [])
+
+  const openRoutineModal = useCallback(() => {
+    setRoutineEditMode(false)
+    setEditingRoutine(null)
+    setShowRoutineForm(false)
+    setRoutines(projectStore.getRoutines())
+    setShowRoutineModal(true)
+  }, [])
+
+  const openAddRoutine = useCallback(() => {
+    setEditingRoutine(null)
+    setRName(''); setRWeekdays([]); setRMonthDays(''); setRTags([]); setRCustomTag('')
+    setShowRoutineForm(true)
+  }, [])
+
+  const openEditRoutine = useCallback((r: Routine) => {
+    setEditingRoutine(r)
+    setRName(r.name)
+    setRWeekdays([...r.weekdays])
+    setRMonthDays(r.monthDays.join(','))
+    setRTags([...r.tags])
+    setRCustomTag('')
+  }, [])
+
+  const addCustomRTag = useCallback(() => {
+    const t = rCustomTag.trim()
+    if (t && !rTags.includes(t)) setRTags(prev => [...prev, t])
+    setRCustomTag('')
+  }, [rCustomTag, rTags])
+
+  const saveRoutine = useCallback(() => {
+    if (!rName.trim()) return
+    const monthDays = rMonthDays.split(/[,，]/).map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n >= 1 && n <= 31)
+    const payload = { name: rName.trim(), weekdays: [...rWeekdays].sort((a, b) => a - b), monthDays: [...new Set(monthDays)].sort((a, b) => a - b), tags: rTags }
+    if (editingRoutine) projectStore.updateRoutine(editingRoutine.id, payload)
+    else projectStore.addRoutine(payload)
+    setEditingRoutine(null); setRName(''); setRWeekdays([]); setRMonthDays(''); setRTags([]); setRCustomTag('')
+    setShowRoutineForm(false)
+  }, [rName, rWeekdays, rMonthDays, rTags, editingRoutine])
 
   // ── Todo state ──
   const [todos, setTodos] = useState<Todo[]>(() => projectStore.getTodos())
@@ -796,6 +873,15 @@ function GanttPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
               </svg>
               待辦
+            </button>
+            <button
+              onClick={openRoutineModal}
+              className="flex items-center gap-1 px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 text-sm font-medium border border-amber-600 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              流水帳
             </button>
             <button
               onClick={handleNavigateToSettings}
@@ -1470,6 +1556,190 @@ function GanttPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {/* 流水帳 modal */}
+      {showRoutineModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={() => setShowRoutineModal(false)}>
+          <div
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-[92%] max-w-lg max-h-[85vh] overflow-y-auto p-5"
+            style={{ maxWidth: 480 }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold flex items-center gap-2 text-gray-700 dark:text-gray-200">
+                <span className="text-amber-500">📒</span> 今日流水帳
+                <span className="text-xs font-normal text-gray-400">{today}</span>
+                {activeRoutines.length > 0 && (
+                  <span className="bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full text-xs">
+                    {activeRoutines.filter(r => isDoneToday(r, today)).length}/{activeRoutines.length}
+                  </span>
+                )}
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setRoutineEditMode(v => !v); setEditingRoutine(null); setShowRoutineForm(false) }}
+                  className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${routineEditMode ? 'bg-amber-500 text-white border-amber-500' : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-amber-400'}`}
+                >
+                  {routineEditMode ? '完成編輯' : '編輯'}
+                </button>
+                <button onClick={() => setShowRoutineModal(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+              </div>
+            </div>
+
+            {/* 檢視模式：今日 checklist */}
+            {!routineEditMode && (
+              activeRoutines.length === 0 ? (
+                <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">今天沒有符合條件的流水帳 👍</p>
+              ) : (
+                <div className="space-y-2">
+                  {activeRoutines.map(r => {
+                    const done = isDoneToday(r, today)
+                    return (
+                      <div
+                        key={r.id}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors ${done ? 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}
+                      >
+                        <button
+                          onClick={() => projectStore.toggleRoutineDone(r.id, today)}
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${done ? 'bg-amber-500 border-amber-500' : 'border-gray-300 dark:border-gray-600 hover:border-amber-400'}`}
+                        >
+                          {done && (
+                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
+                        <span className={`flex-1 text-sm cursor-pointer ${done ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-200'}`} onClick={() => projectStore.toggleRoutineDone(r.id, today)}>
+                          {r.name}
+                        </span>
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500 flex-shrink-0">
+                          {r.weekdays.length > 0 && r.weekdays.map(d => WEEKDAY_LABELS[d]).join('/')}
+                          {r.weekdays.length > 0 && (r.monthDays.length > 0 || r.tags.length > 0) && ' · '}
+                          {r.monthDays.length > 0 && `${r.monthDays.join('/')}號`}
+                          {r.monthDays.length > 0 && r.tags.length > 0 && ' · '}
+                          {r.tags.length > 0 && r.tags.map(t => `#${t}`).join(' ')}
+                        </span>
+                      </div>
+                    )
+                  })}
+                  {activeRoutines.length > 0 && activeRoutines.every(r => isDoneToday(r, today)) && (
+                    <p className="text-center text-sm text-amber-500 pt-2">🎉 今天的全部完成了！</p>
+                  )}
+                </div>
+              )
+            )}
+
+            {/* 編輯模式：清單 + 表單 */}
+            {routineEditMode && (
+              <div className="space-y-2">
+                {!editingRoutine && (
+                  <button onClick={openAddRoutine} className="w-full py-2 border-2 border-dashed border-amber-300 dark:border-amber-700 rounded-lg text-amber-500 hover:border-amber-400 transition-colors text-sm">
+                    ＋ 新增流水帳項目
+                  </button>
+                )}
+                {routines.length === 0 && !editingRoutine && (
+                  <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">尚無流水帳項目，按上方按鈕新增</p>
+                )}
+                {!editingRoutine && routines.map(r => (
+                  <div key={r.id} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <span className="flex-1 text-sm text-gray-700 dark:text-gray-200">{r.name}</span>
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                      {r.weekdays.length > 0 ? r.weekdays.map(d => WEEKDAY_LABELS[d]).join('/') : ''}
+                      {r.monthDays.length > 0 ? ` ${r.monthDays.join('/')}號` : ''}
+                      {r.tags.length > 0 ? ` ${r.tags.map(t => `#${t}`).join(' ')}` : ''}
+                    </span>
+                    <button onClick={() => openEditRoutine(r)} className="text-xs text-blue-500 hover:text-blue-700">編輯</button>
+                    <button onClick={() => { if (confirm(`確定刪除「${r.name}」？`)) projectStore.removeRoutine(r.id) }} className="text-xs text-red-500 hover:text-red-700">刪除</button>
+                  </div>
+                ))}
+
+                {(editingRoutine || showRoutineForm) && (
+                  <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 space-y-3">
+                    <h4 className="text-sm font-medium text-gray-600 dark:text-gray-300">{editingRoutine ? '編輯項目' : '新增項目'}</h4>
+                    <div>
+                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">名稱</label>
+                      <input
+                        type="text"
+                        value={rName}
+                        onChange={e => setRName(e.target.value)}
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        placeholder="例：檢查 email、澆花"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">星期（可多選；加上下方條件為「或」）</label>
+                      <div className="flex gap-1">
+                        {WEEKDAY_LABELS.map((lbl, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setRWeekdays(prev => prev.includes(i) ? prev.filter(d => d !== i) : [...prev, i])}
+                            className={`w-8 h-8 text-xs rounded-full border transition-colors ${rWeekdays.includes(i) ? 'bg-amber-500 text-white border-amber-500' : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-amber-400'}`}
+                          >
+                            {lbl}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">每月幾號出現（逗號分隔，留空=不適用）</label>
+                      <input
+                        type="text"
+                        value={rMonthDays}
+                        onChange={e => setRMonthDays(e.target.value)}
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        placeholder="例：1,15"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">今日活動含以下標籤時出現</label>
+                      <div className="flex flex-wrap gap-1 mb-1">
+                        {QUICK_TAGS.map(t => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => setRTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])}
+                            className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${rTags.includes(t) ? 'bg-amber-500 text-white border-amber-500' : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-amber-400'}`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                        {rTags.filter(t => !QUICK_TAGS.includes(t)).map(t => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => setRTags(prev => prev.filter(x => x !== t))}
+                            className="px-2 py-0.5 text-xs rounded-full border bg-amber-500 text-white border-amber-500"
+                            title="點擊移除"
+                          >
+                            {t} ✕
+                          </button>
+                        ))}
+                      </div>
+                      <input
+                        type="text"
+                        value={rCustomTag}
+                        onChange={e => setRCustomTag(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomRTag() } }}
+                        onBlur={addCustomRTag}
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        placeholder="其他標籤，輸入後按 Enter"
+                      />
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button onClick={() => { setEditingRoutine(null); setShowRoutineForm(false); setRName(''); setRWeekdays([]); setRMonthDays(''); setRTags([]); setRCustomTag('') }} className="flex-1 px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                        取消
+                      </button>
+                      <button onClick={saveRoutine} disabled={!rName.trim()} className="flex-1 px-3 py-2 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                        {editingRoutine ? '儲存' : '新增'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
