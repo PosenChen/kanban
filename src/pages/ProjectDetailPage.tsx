@@ -6,6 +6,7 @@ import { getRemainingDays, getDaysDiff, formatMonthDay } from '@/utils/dateUtils
 import ProjectForm from '@/components/ProjectForm'
 import ProjectCard from '@/components/ProjectCard'
 import { useState } from 'react'
+import { buildTemplate, collectSubtree, buildWordHtml, downloadBlob } from '@/utils/exportUtils'
 
 function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -16,6 +17,7 @@ function ProjectDetailPage() {
   const project = getById(id)
   const [showForm, setShowForm] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
 
   const children = getByParent(id)
 
@@ -134,6 +136,39 @@ function ProjectDetailPage() {
             >
               複製
             </button>
+            {/* 匯出下拉 */}
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu(v => !v)}
+                className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800"
+              >
+                匯出 ▾
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-30 overflow-hidden">
+                  <button
+                    onClick={() => {
+                      const tpl = buildTemplate(getAll(), id, new Date())
+                      downloadBlob(`${project.name}-專案模板.json`, JSON.stringify(tpl, null, 2), 'application/json')
+                      setShowExportMenu(false)
+                    }}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    📤 JSON 模板（含子專案）
+                  </button>
+                  <button
+                    onClick={() => {
+                      const sub = collectSubtree(getAll(), id)
+                      downloadBlob(`${project.name}.doc`, buildWordHtml(project, sub), 'application/msword')
+                      setShowExportMenu(false)
+                    }}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    📄 Word 文件 (.doc)
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               onClick={handleDelete}
               className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
