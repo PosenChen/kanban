@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
 import { projectStore, setStorageSource, isColorByPriority, STORAGE_KEY_COLOR_BY_PRIORITY } from '@/data/localStorageStore'
 import { STATUS_CONFIG, QUICK_TAGS, WEEKDAY_LABELS, type Project, type Milestone, type Todo, type ProjectPriority, type Routine } from '@/types/project'
@@ -946,6 +946,9 @@ function GanttPage() {
             </div>
           )}
           <div className="flex items-center gap-3 ml-auto">
+            <Link to="/archive" className="flex items-center gap-1 px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors" title="已退場項目的歷史檔案">
+              🗂️ 檔案庫
+            </Link>
             <label className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 cursor-pointer select-none" title="開啟後依優先級降低色塊飽和度（高=不變、中=偏灰、低=更淡灰）；關閉 = 色塊飽和度只由狀態決定（維持舊行為）">
               <input
                 type="checkbox"

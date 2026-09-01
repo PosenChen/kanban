@@ -15,6 +15,7 @@ function App() {
         <Route path="/board" element={<KanbanBoard />} />
         <Route path="/project/:id" element={<ProjectDetailPage />} />
         <Route path="/daily/:date?" element={<DailyPage />} />
+        <Route path="/archive" element={<ArchivePage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Routes>
       <ThemeToggle />

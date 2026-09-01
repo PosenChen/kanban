@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
-import { projectStore, scheduleGitHubSync, getSyncStatus, getStorageSource, setStorageSource } from '@/data/localStorageStore'
+import { projectStore, scheduleGitHubSync, getSyncStatus, getStorageSource, setStorageSource, getArchiveDays } from '@/data/localStorageStore'
 import { isProjectTemplate } from '@/utils/exportUtils'
 
 function SettingsPage() {
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'loading' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
   const [syncInfo, setSyncInfo] = useState({ hasToken: false })
+  const [archiveDays] = useState(() => getArchiveDays())
 
   useEffect(() => {
     setSyncInfo(getSyncStatus())
@@ -244,6 +245,29 @@ function SettingsPage() {
             <button onClick={handleImport}
               className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:bg-gray-700">📥 匯入 JSON</button>
           </div>
+        </div>
+
+        {/* 自動退場 */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">🗂️ 自動退場</h3>
+          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+            <span>完成後逾</span>
+            <input
+              type="number"
+              min={0}
+              defaultValue={archiveDays}
+              onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+              onBlur={e => {
+                const n = Math.max(0, parseInt(e.target.value, 10) || 0)
+                e.target.value = String(n)
+                localStorage.setItem('kanban_archive_days', String(n))
+                projectStore.autoArchive()
+              }}
+              className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-center"
+            />
+            <span>天自動退入檔案庫（總覽不再顯示，資料保留）</span>
+          </div>
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">父專案連同全部子專案一併退場；可在檔案庫隨時還原。</p>
         </div>
 
         {/* 使用說明 */}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import MainLayout from '@/layouts/MainLayout'
+import { Link } from 'react-router-dom'
 import { projectStore, getArchiveDays } from '@/data/localStorageStore'
 import type { Milestone, Project, Todo } from '@/types/project'
 
@@ -77,21 +77,24 @@ function ArchivePage() {
   const empty = data.projects.length === 0 && data.milestones.length === 0 && data.todos.length === 0
 
   return (
-    <MainLayout>
-      <div className="space-y-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
+      <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold flex items-center gap-2 text-gray-700 dark:text-gray-200">
-            🗄️ 檔案庫
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+            🗂️ 檔案庫
             <span className="text-xs font-normal text-gray-400 dark:text-gray-500">
               完成後逾 {days} 天的項目自動退場於此，隨時可回顧或還原
             </span>
-          </h2>
-          <a href="#/" className="text-sm text-blue-500 hover:text-blue-600">← 返回總覽</a>
+          </h1>
+          <Link to="/" className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+            返回總覽
+          </Link>
         </div>
 
         {empty && (
           <div className="text-center py-16 text-gray-400 dark:text-gray-500">
-            <div className="text-4xl mb-3">🗄️</div>
+            <div className="text-4xl mb-3">🗂️</div>
             <p>檔案庫還是空的——完成的項目退場後會出現在這裡</p>
           </div>
         )}
@@ -139,7 +142,7 @@ function ArchivePage() {
           )
         })}
       </div>
-    </MainLayout>
+    </div>
   )
 }
 
