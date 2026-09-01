@@ -11,6 +11,7 @@ export interface Milestone {
   description?: string
   created_at: string
   updated_at: string
+  archived_at?: string // YYYY-MM-DD — 退場日；undefined = 仍在總覽
 }
 
 export interface Project {
@@ -29,6 +30,7 @@ export interface Project {
   updated_at: string // ISO-8601
   actual_start_date?: string
   actual_end_date?: string
+  archived_at?: string // YYYY-MM-DD — 退場日；undefined = 仍在總覽
 }
 
 export type ProjectStatusLabel = {
@@ -66,6 +68,7 @@ export interface Todo {
   completed: boolean
   created_at: string
   updated_at: string
+  archived_at?: string // YYYY-MM-DD — 退場日；undefined = 仍在總覽
 }
 
 // Quick-pick tags offered as one-tap buttons in project & activity forms
