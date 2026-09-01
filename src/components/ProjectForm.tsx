@@ -49,7 +49,8 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects, defaultStar
       name: name.trim(),
       description: description.trim(),
       parent_id: parentId || null,
-      sort_order: 0,
+      // 編輯時保留原排序權重，避免存檔後專案跳到甘特圖頂部（新增時才用 0 排尾由 store 處理）
+      sort_order: editProject?.sort_order ?? 0,
       start_date: startDate,
       end_date: endDate,
       status,
