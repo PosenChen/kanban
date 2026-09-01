@@ -2,6 +2,7 @@ import type { Project, Milestone, Todo, Routine } from '@/types/project'
 import { SAMPLE_PROJECTS_WITH_META } from './sampleData'
 import { dateToStr, formatDate } from '@/utils/dateUtils'
 import { remapAndShift, type ProjectTemplate } from '@/utils/exportUtils'
+import { isItemArchivable, selectArchivableGroups, type GroupNode } from '@/utils/archiveUtils'
 
 const STORAGE_KEY_DATA = 'kanban_projects'
 const STORAGE_KEY_MILESTONES = 'kanban_milestones'
@@ -10,6 +11,13 @@ const STORAGE_KEY_TOKEN = 'kanban_github_token'
 const STORAGE_KEY_SOURCE = 'kanban_storage_source'
 export const STORAGE_KEY_COLOR_BY_PRIORITY = 'kanban_color_by_priority'
 const STORAGE_KEY_ROUTINES = 'kanban_routines'
+const STORAGE_KEY_ARCHIVE_DAYS = 'kanban_archive_days'
+
+/** 退場門檻天數：完成且逾期達此天數才自動退場（預設 14，使用者確認 20260901）。 */
+export function getArchiveDays(): number {
+  const n = parseInt(localStorage.getItem(STORAGE_KEY_ARCHIVE_DAYS) ?? '14', 10)
+  return Number.isFinite(n) && n >= 0 ? n : 14
+}
 
 /** Default ON unless the user explicitly turned it off ('false'). */
 export function isColorByPriority(): boolean {
@@ -791,6 +799,7 @@ export const projectStore = {
 
       emitProjectChange()
       setStorageSource('github')
+      projectStore.autoArchive()
       return cached
     }
     // Also try loading todos even if no projects
@@ -809,6 +818,117 @@ export const projectStore = {
     return []
   },
 
+  // ── Archive（退場/檔案庫）：archived_at 標記，絕不自動刪除 ──
+  autoArchive(): void {
+    const today = new Date()
+    const days = getArchiveDays()
+    const todayS = dateToStr(today)
+
+    // Projects: parent-group rule — 父與全部子孫皆完成且最晚結束日過期，整群退場
+    const byParent = new Map<string | null, Project[]>()
+    for (const p of cached) {
+      const k = p.parent_id ?? null
+      if (!byParent.has(k)) byParent.set(k, [])
+      byParent.get(k)!.push(p)
+    }
+    const buildNode = (p: Project): GroupNode => ({
+      id: p.id,
+      doneDate: p.status === 'completed' ? p.end_date : null,
+      children: (byParent.get(p.id) ?? []).map(buildNode),
+      archived: !!p.archived_at,
+    })
+    const roots = cached.filter(p => !p.parent_id)
+    const groupIds = new Set(selectArchivableGroups(roots.map(buildNode), today, days))
+    // 已退場項目的未退場子孫也要跟著退場（保持群組一致）
+    const ensureSubtree = (ids: Set<string>) => {
+      let grew = true
+      while (grew) {
+        grew = false
+        for (const p of cached) {
+          if (p.parent_id && ids.has(p.parent_id) && !ids.has(p.id)) {
+            ids.add(p.id)
+            grew = true
+          }
+        }
+      }
+    }
+    ensureSubtree(groupIds)
+
+    let changed = false
+    cached = cached.map(p => {
+      if (p.archived_at || !groupIds.has(p.id)) return p
+      changed = true
+      return { ...p, archived_at: todayS }
+    })
+
+    const markTodos = todos.map(t => {
+      if (isItemArchivable({ id: t.id, doneDate: t.completed ? t.updated_at.slice(0, 10) : null, archived: !!t.archived_at }, today, days)) {
+        changed = true
+        return { ...t, archived_at: todayS }
+      }
+      return t
+    })
+    const markMs = milestones.map(m => {
+      if (isItemArchivable({ id: m.id, doneDate: m.end_date, archived: !!m.archived_at }, today, days)) {
+        changed = true
+        return { ...m, archived_at: todayS }
+      }
+      return m
+    })
+
+    if (!changed) return
+    todos = markTodos
+    milestones = markMs
+    saveLocal(cached)
+    saveTodos(todos)
+    saveMilestones(milestones)
+    emitProjectChange()
+    emitTodoChange()
+    emitMilestoneChange()
+  },
+
+  archive(kind: 'project' | 'todo' | 'milestone', id: string): void {
+    const todayS = dateToStr(new Date())
+    if (kind === 'project') {
+      cached = cached.map(p => p.id === id ? { ...p, archived_at: todayS } : p)
+      saveLocal(cached)
+      emitProjectChange()
+    } else if (kind === 'milestone') {
+      milestones = milestones.map(m => m.id === id ? { ...m, archived_at: todayS } : m)
+      saveMilestones(milestones)
+      emitMilestoneChange()
+    } else {
+      todos = todos.map(t => t.id === id ? { ...t, archived_at: todayS } : t)
+      saveTodos(todos)
+      emitTodoChange()
+    }
+  },
+
+  unarchive(kind: 'project' | 'todo' | 'milestone', id: string): void {
+    if (kind === 'project') {
+      cached = cached.map(p => p.id === id ? { ...p, archived_at: undefined } : p)
+      saveLocal(cached)
+      emitProjectChange()
+    } else if (kind === 'milestone') {
+      milestones = milestones.map(m => m.id === id ? { ...m, archived_at: undefined } : m)
+      saveMilestones(milestones)
+      emitMilestoneChange()
+    } else {
+      todos = todos.map(t => t.id === id ? { ...t, archived_at: undefined } : t)
+      saveTodos(todos)
+      emitTodoChange()
+    }
+  },
+
+  getArchived(): { projects: Project[]; milestones: Milestone[]; todos: Todo[] } {
+    const byArchivedDesc = <T extends { archived_at?: string }>(a: T, b: T) => (b.archived_at ?? '').localeCompare(a.archived_at ?? '')
+    return {
+      projects: cached.filter(p => p.archived_at).sort(byArchivedDesc),
+      milestones: milestones.filter(m => m.archived_at).sort(byArchivedDesc),
+      todos: todos.filter(t => t.archived_at).sort(byArchivedDesc),
+    }
+  },
+
   sync() {
     cached = loadLocal()
     milestones = loadMilestones()
@@ -820,6 +940,9 @@ export const projectStore = {
     emitRoutineChange()
   },
 }
+
+// 模組載入（migration 之後）與跨分頁 sync 時執行自動退場
+projectStore.autoArchive()
 
 // Cross-tab sync
 window.addEventListener('storage', (e) => {
