@@ -6,10 +6,11 @@
 |------|------|
 | 🌐 **部署站點** | [posenchen.github.io/kanban](https://posenchen.github.io/kanban/) |
 | 📅 **專案啟動** | 2026-08-22 |
-| 🔄 **最新版本** | 2026-08-30 |
-| 📦 **技術棧** | React 19 + TypeScript 7 + Vite 8 + Tailwind CSS v4 |
+| 🔄 **最新版本** | 2026-08-31 |
+| 📦 **技術架構** | React 19 + TypeScript 7 + Vite 8 + Tailwind CSS v4 |
+| 🧪 **單元測試** | Vitest（14 tests passed：流水帳觸發比對、模板匯出/匯入） |
 | 🐙 **原始碼** | [PosenChen/kanban](https://github.com/PosenChen/kanban) |
-| 📦 **資料備份倉庫** | [PosenChen/kanban-data](https://github.com/PosenChen/kanban-data)（`data/projects.json` / `milestones.json` / `todos.json`） |
+| 📦 **資料備份倉庫** | [PosenChen/kanban-data](https://github.com/PosenChen/kanban-data)（`data/projects.json` / `milestones.json` / `todos.json` / `routines.json`） |
 
 ---
 
@@ -22,10 +23,13 @@
 | **優先級飽和度色階** | 色塊依優先級飽和度 100/72/45 分級（`kanban_color_by_priority` 開關，預設開啟），圖例與色塊同步；淺色模式自動夾取亮度保證白字對比 |
 | **看板視圖** | 四欄式（準備中 / 等待中 / 進行中 / 已完成），專案卡片含優先級標籤、進度條、剩餘天數 |
 | **日曆視圖** | 按日期檢視當天專案與活動；手機單欄堆疊、桌面（≥768px）三欄並排（待辦 / 專案 / 活動） |
-| **專案詳細頁** | 子專案管理、進展追蹤、實際進度標記 |
+| **專案詳細頁** | 子專案管理、進展追蹤、實際進度標記；**匯出選單**：JSON 專案模板（含子樹）/ Word 文件（.doc） |
+| **流水帳（日常例行事）** | 總覽頁 📒 流水帳彈窗：依**星期 / 月內日 / 標籤**三維度觸發（同維度 OR、跨維度 OR、全空不出現），每日勾選打勾（隔天自動失效），CRUD + GitHub 同步（`routines.json`） |
+| **專案模板匯入** | 匯出含子樹的模板 JSON（`anchor_start` 記 workflow 起點）；匯入自動偵測模板 → 發新 ID、父連重掛、日期**重錨定至今日**、狀態重置準備中/進度歸零，附加不覆蓋（每年固定專案一鍵重用） |
 | **活動管理** | 可新增/編輯/刪除活動，支援**跨天日期範圍**（同名且日期相鄰自動合併）、標籤篩選、甘特圖色塊顯示 |
 | **待辦事項** | 名稱/優先級/說明，CRUD 操作，完成狀態標記，▲▼ 排序 |
-| **搜尋與篩選** | 全文搜尋 + 狀態/優先級/標籤多條件篩選 |
+| **搜尋與篩選** | 全文搜尋 + 狀態/優先級/標籤多條件篩選；優先級篩選**同步過濾待辦清單**，空結果顯示篩選提示 |
+| **標籤快速選取** | 專案/活動表單移除預填標籤，改由「工作 / 採購 / 上課…」快速選取按鈕選標籤 |
 | **專案複製** | 一鍵深層複製專案與所有子孫，名稱自動加 `Q` 後綴 |
 | **排序功能** | 父專案、子專案、待辦事項皆可 ▲▼ 重排；凍結側欄與待辦清單首尾智能隱藏箭頭 |
 | **展開狀態持久化** | 甘特圖父子專案展開/收合狀態存入 `localStorage`，跨頁與重載保持 |
@@ -43,6 +47,7 @@
 - **樣式**: Tailwind CSS v4.3 (`@tailwindcss/vite`) + 自繪 SVG 甘特圖（不依賴 frappe-gantt 渲染元件）
 - **狀態管理**: React hooks (`useProjects`) + `kanban:data-change` CustomEvent 驅動重繪
 - **數據持久化**: LocalStorage + GitHub Content API (PosenChen/kanban-data)
+- **單元測試**: Vitest（`src/utils/*.test.ts`：流水帳觸發比對、模板組裝/重掛/偏移）
 - **部署**: GitHub Pages (GitHub Actions CI/CD: build → upload-pages-artifact → deploy-pages)
 
 ---
@@ -61,15 +66,19 @@ kanban/
 └── src/
     ├── App.tsx               # 主應用路由 + 全域 ThemeToggle
     ├── types/
-    │   └── project.ts        # 資料型別 (Project, Milestone, Todo) + 狀態/優先級設定
+    │   └── project.ts        # 資料型別 (Project, Milestone, Todo, Routine, ProjectTemplate) + 狀態/優先級設定
     ├── data/
-    │   ├── localStorageStore.ts  # 資料持久化（LocalStorage + GitHub API 同步 + migration）
+    │   ├── localStorageStore.ts  # 資料持久化（LocalStorage + GitHub API 同步 + migration + 模板匯入）
     │   └── sampleData.ts       # 示範資料
     ├── hooks/
     │   └── useProjects.ts      # React hook wrapper（暴露 store CRUD/排序方法）
     ├── utils/
     │   ├── dateUtils.ts        # 日期工具函數
-    │   └── theme.ts            # 主題管理（localStorage['kanban_theme'] + useTheme hook）
+    │   ├── theme.ts            # 主題管理（localStorage['kanban_theme'] + useTheme hook）
+    │   ├── routineUtils.ts     # 流水帳觸發比對（三維度 OR）
+    │   ├── routineUtils.test.ts    # 流水帳單元測試（9 tests）
+    │   ├── exportUtils.ts      # 專案模板組裝/匯出 + Word HTML builder
+    │   └── exportUtils.test.ts     # 模板單元測試（5 tests）
     ├── components/
     │   ├── FilterBar.tsx       # 搜尋/篩選列
     │   ├── ProjectCard.tsx     # 看板卡片
@@ -100,6 +109,9 @@ npm run dev
 # 類型檢查與構建（tsc + vite build）
 npm run build
 
+# 單元測試（vitest）
+npm run test
+
 # 預覽構建結果
 npm run preview
 ```
@@ -110,11 +122,11 @@ npm run preview
 
 ## 🔄 數據同步
 
-- **LocalStorage**: 預設使用瀏覽器本地儲存（keys: `kanban_projects` / `kanban_milestones` / `kanban_todos`），所有修改即時生效
+- **LocalStorage**: 預設使用瀏覽器本地儲存（keys: `kanban_projects` / `kanban_milestones` / `kanban_todos` / `kanban_routines`），所有修改即時生效
 - **GitHub API**: 在設定頁填入 Personal Access Token 後可啟用雲端同步
   - 手動下載：從 `PosenChen/kanban-data` 拉取最新資料（`kanban_storage_source = "github"` 時啟用）
   - 自動上傳：修改後 3 秒去抖自動同步至 GitHub
-  - 三個資料檔：`data/projects.json`、`data/milestones.json`、`data/todos.json`
+  - 四個資料檔：`data/projects.json`、`data/milestones.json`、`data/todos.json`、`data/routines.json`
 - **載入時自動遷移**: 舊格式 `date` 自動轉為 `start_date`/`end_date`；缺失或重複的 `sort_order` 自動重排為連續值
 
 ---
@@ -159,6 +171,29 @@ npm run preview
 | description? | string | 待辦說明 |
 | completed | boolean | 完成狀態 |
 | created_at / updated_at | string | ISO-8601 時間戳 |
+
+### Routine（流水帳／日常例行事）
+| 欄位 | 類型 | 說明 |
+|------|------|------|
+| id | string | 唯一識別碼 |
+| name | string | 事項名稱 |
+| weekdays | number[] | 觸發星期（0=日 … 6=六），同維度內 OR |
+| monthDays | number[] | 觸發月內日（1..31），同維度內 OR |
+| tags | string[] | 今日活動含任一標籤即觸發 |
+| sort_order | number | 排序權重（0 = 頂部） |
+| completed_date? | string | 最後勾選日（YYYY-MM-DD），隔天自動失效 |
+| created_at / updated_at | string | ISO-8601 時間戳 |
+
+> 觸發語意：同一維度內 OR、跨維度 OR、全空條件 = 永不出現。
+
+### ProjectTemplate（專案模板）
+| 欄位 | 類型 | 說明 |
+|------|------|------|
+| kind | `'kanban-project-template'` | 模板識別標記（匯入時自動偵測） |
+| version | number | 模板格式版本（目前 1） |
+| exported_at | string | 匯出時間戳 |
+| anchor_start | string | 子樹最早開始日期（匯入時日期依此重錨定） |
+| projects | Project[] | 深度優先排序的子樹（父在子前） |
 
 ---
 
@@ -209,6 +244,14 @@ npm run preview
 - **拖曳色塊/活動條直接移動日期**、左右邊緣手柄**縮放長短**：幽靈預覽、逐日吸附、點擊與拖曳安全區分（click-safe）
 - 「＋新增」改為直接開啟專案表單彈窗（不再先建立佔位專案）；新增子專案後自動展開父專案
 
+### 🗓️ 2026-08-31 — 流水帳、專案模板與單元測試
+- **流水帳（Routine）**：`Routine` 型別 + 三維度 OR 觸發比對（星期/月內日/標籤）、總覽頁 📒 彈窗（今日清單 + 勾選 + 編輯）、store CRUD + `routines.json` GitHub 同步
+- **專案模板匯出/匯入**：子樹深度優先收集、`anchor_start` 錨定、匯入發新 ID + 父連重掛 + 日期重錨定今日 + 狀態重置；匯入自動偵測模板 JSON（附加不覆蓋）
+- **專案詳細頁匯出選單**：JSON 專案模板（含子專案）/ Word 文件（.doc）
+- **篩選增強**：優先級篩選同步過濾待辦清單、空結果顯示篩選提示、排序箭頭改依可見清單
+- **標籤快速選取**：表單移除「活動」預填，改工作/採購/上課…快速按鈕
+- **工程化**：引入 Vitest 單元測試（`routineUtils` 9 + `exportUtils` 5 = 14 tests passed）
+
 ---
 
 ## 🗺️ Roadmap
@@ -218,6 +261,9 @@ npm run preview
 - [x] 深色/淺色主題切換
 - [x] 活動日期範圍 + 自動合併
 - [x] 甘特圖拖曳移動/縮放色塊
+- [x] 流水帳（日常例行事）三維度觸發 + 每日勾選
+- [x] 專案模板匯出/匯入（日期重錨定，年度固定專案重用）
+- [x] 優先級篩選同步過濾待辦
 - [ ] 待辦事項的日期關聯
 - [ ] 專案子任務管理
 - [ ] 更多視覺自訂選項
@@ -230,4 +276,4 @@ MIT
 
 ---
 
-*最後更新：2026-08-31*
+*最後更新：2026-09-01*
