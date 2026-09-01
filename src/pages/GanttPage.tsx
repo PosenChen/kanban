@@ -831,7 +831,7 @@ function GanttPage() {
               onChange={e => setStatusFilter(e.target.value)}
               className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
-              <option value="">狀態 ▾</option>
+              <option value="">狀態</option>
               <option value="preparation">準備中</option>
               <option value="waiting">等待中</option>
               <option value="in_progress">進行中</option>
