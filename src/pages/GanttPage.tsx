@@ -842,7 +842,7 @@ function GanttPage() {
               onChange={e => setPriorityFilter(e.target.value)}
               className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
-              <option value="">優先級 ▾</option>
+              <option value="">優先級</option>
               <option value="high">高</option>
               <option value="medium">中</option>
               <option value="low">低</option>
