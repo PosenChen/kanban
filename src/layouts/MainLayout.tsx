@@ -27,6 +27,9 @@ function MainLayout() {
               <Link to="/daily" className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${isActive('/daily') ? 'bg-blue-50 dark:bg-blue-950 text-blue-600 font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200'}`}>
                 日曆
               </Link>
+              <Link to="/archive" className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${location.pathname === '/archive' ? 'bg-blue-50 dark:bg-blue-950 text-blue-600 font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200'}`}>
+                檔案庫
+              </Link>
               <Link to="/settings" className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${location.pathname === '/settings' ? 'bg-blue-50 dark:bg-blue-950 text-blue-600 font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200'}`}>
                 設定
               </Link>

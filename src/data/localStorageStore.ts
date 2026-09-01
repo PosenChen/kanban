@@ -908,6 +908,32 @@ export const projectStore = {
     }
   },
 
+  unarchiveAncestry(id: string): void {
+    // 沿 parent 鏈向上還原整條挂靠鏈，並補齊本項目的整棵子樹
+    // （群組回到總覽時必須結構完整，但不含兄弟群組）
+    const byId = new Map(cached.map(p => [p.id, p]))
+    const ids = new Set<string>()
+    // 1) 祖先鏈：自己 → 父 → …… → 根
+    let cur = byId.get(id)
+    while (cur) {
+      ids.add(cur.id)
+      cur = cur.parent_id ? byId.get(cur.parent_id) : undefined
+    }
+    // 2) 自己的後代（僅自己這棵子樹）
+    const collectKids = (pid: string) => {
+      for (const p of cached) {
+        if (p.parent_id === pid && !ids.has(p.id)) {
+          ids.add(p.id)
+          collectKids(p.id)
+        }
+      }
+    }
+    collectKids(id)
+    cached = cached.map(p => ids.has(p.id) ? { ...p, archived_at: undefined } : p)
+    saveLocal(cached)
+    emitProjectChange()
+  },
+
   unarchive(kind: 'project' | 'todo' | 'milestone', id: string): void {
     if (kind === 'project') {
       cached = cached.map(p => p.id === id ? { ...p, archived_at: undefined } : p)
