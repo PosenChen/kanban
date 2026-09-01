@@ -322,7 +322,7 @@ saveLocal(cached)
 saveTodos(todos)
 
 function emitProjectChange() {
-  window.dispatchEvent(new CustomEvent('kanban:data-change', { detail: cached }))
+  window.dispatchEvent(new CustomEvent('kanban:data-change', { detail: cached.filter(p => !p.archived_at) }))
 }
 
 function emitProjectCopied(projectId: string) {
@@ -330,11 +330,11 @@ function emitProjectCopied(projectId: string) {
 }
 
 function emitMilestoneChange() {
-  window.dispatchEvent(new CustomEvent('kanban:milestone-change', { detail: milestones }))
+  window.dispatchEvent(new CustomEvent('kanban:milestone-change', { detail: milestones.filter(m => !m.archived_at) }))
 }
 
 function emitTodoChange() {
-  window.dispatchEvent(new CustomEvent('kanban:todo-change', { detail: todos }))
+  window.dispatchEvent(new CustomEvent('kanban:todo-change', { detail: todos.filter(t => !t.archived_at) }))
 }
 
 function emitRoutineChange() {
@@ -343,6 +343,10 @@ function emitRoutineChange() {
 
 export const projectStore = {
   getAll(): Project[] {
+    return cached.filter(p => !p.archived_at)
+  },
+
+  getAllRaw(): Project[] {
     return cached
   },
 
@@ -351,15 +355,15 @@ export const projectStore = {
   },
 
   getByParent(parentId: string | null): Project[] {
-    return cached.filter(p => p.parent_id === parentId)
+    return cached.filter(p => p.parent_id === parentId && !p.archived_at)
   },
 
   getByDate(date: string): Project[] {
-    return cached.filter(p => p.start_date <= date && p.end_date >= date)
+    return cached.filter(p => !p.archived_at && p.start_date <= date && p.end_date >= date)
   },
 
   getByTag(tag: string): Project[] {
-    return cached.filter(p => p.tags.includes(tag))
+    return cached.filter(p => !p.archived_at && p.tags.includes(tag))
   },
 
   search(query: string): Project[] {
@@ -427,7 +431,7 @@ export const projectStore = {
   },
 
   getChildren(projectId: string): Project[] {
-    return cached.filter(p => p.parent_id === projectId)
+    return cached.filter(p => p.parent_id === projectId && !p.archived_at)
   },
 
   /** Deep copy a project and all its children recursively, appending 'Q' to names */
@@ -603,7 +607,7 @@ export const projectStore = {
   },
 
   getMilestones(): Milestone[] {
-    return milestones
+    return milestones.filter(m => !m.archived_at)
   },
 
   getMilestoneById(id: string): Milestone | undefined {
@@ -652,7 +656,7 @@ export const projectStore = {
   },
 
   getTodos(): Todo[] {
-    return todos
+    return todos.filter(t => !t.archived_at)
   },
 
   updateTodo(id: string, updates: Partial<Todo>): Todo | undefined {
