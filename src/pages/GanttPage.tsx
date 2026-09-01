@@ -878,15 +878,31 @@ function GanttPage() {
               </svg>
               待辦
             </button>
-            <button
-              onClick={openRoutineModal}
-              className="flex items-center gap-1 px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 text-sm font-medium border border-amber-600 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              流水帳
-            </button>
+            {(() => {
+              // 流水帳狀態提醒：未完成 → -count 徽章 + 脈動；全部完成 → 綠勾；今日無流水帳 → 原樣
+              const total = activeRoutines.length
+              const done = activeRoutines.filter(r => isDoneToday(r, today)).length
+              const pending = total - done
+              const allDone = total > 0 && pending === 0
+              return (
+                <button
+                  onClick={openRoutineModal}
+                  title={total === 0 ? '流水帳' : allDone ? '今日流水帳已全部完成' : `今日流水帳還有 ${pending} 項未完成`}
+                  className={`relative flex items-center gap-1 px-3 py-2 rounded-lg text-sm transition-colors bg-amber-500 text-white hover:bg-amber-600 border-amber-600 ${pending > 0 ? 'font-bold border-2 border-dashed' : 'font-medium border'}`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  流水帳
+                  {pending > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none animate-pulse shadow">
+                      {pending}
+                    </span>
+                  )}
+                  {allDone && <span className="text-emerald-200">✓</span>}
+                </button>
+              )
+            })()}
             <button
               onClick={handleNavigateToSettings}
               className="flex items-center gap-1 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm font-medium border border-green-600 transition-colors"
