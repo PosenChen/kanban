@@ -953,6 +953,9 @@ function GanttPage() {
             </div>
           )}
           <div className="flex items-center gap-3 ml-auto">
+            <Link to="/ledger" className="flex items-center gap-1 px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors" title="收支記帳">
+              💰 記帳
+            </Link>
             <Link to="/archive" className="flex items-center gap-1 px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors" title="已退場項目的歷史檔案">
               🗂️ 檔案庫
             </Link>
