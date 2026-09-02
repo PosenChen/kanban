@@ -190,6 +190,12 @@ function GanttPage() {
     setTodos([...projectStore.getTodos()])
   }, [])
 
+  // ── 拖曳排序：待辦清單（單一群組）──
+  const todoDnd = useDragReorder(({ draggedId, beforeId }) => {
+    projectStore.moveTodoToSlot(draggedId, beforeId)
+    setTodos([...projectStore.getTodos()])
+  })
+
   // ── Filtering ──
   const filteredList = useMemo(() => {
     let list = projects
@@ -1356,10 +1362,29 @@ function GanttPage() {
           </p>
         ) : (
           <div className="space-y-2">
-            {visibleTodos.map(todo => (
+            {visibleTodos.map(todo => {
+              const todoDropBefore = todoDnd.dropTarget?.id === todo.id && todoDnd.dropTarget.before
+              const todoDropAfter = todoDnd.dropTarget?.id === todo.id && !todoDnd.dropTarget.before
+              return (
               <div
                 key={todo.id}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors ${
+                draggable
+                onDragStart={todoDnd.start(todo.id)}
+                onDragOver={e => todoDnd.over(e, todo.id)}
+                onDragLeave={() => todoDnd.leave(todo.id)}
+                onDrop={(e) => todoDnd.drop(e, todo.id, (overId, before, draggedId) => {
+                  if (before) return overId
+                  const rest = visibleTodos.filter(t => t.id !== draggedId)
+                  return nextIdAfter(rest, overId) // 無下一筆 → null（置末）
+                })}
+                onDragEnd={todoDnd.clear}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors select-none ${
+                  todoDnd.draggingId === todo.id ? 'opacity-40' : ''
+                } ${
+                  todoDropAfter ? '!border-b-2 !border-b-blue-500'
+                  : todoDropBefore ? '!border-t-2 !border-t-blue-500'
+                  : ''
+                } ${
                   todo.completed
                     ? 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
                     : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:border-gray-600'
@@ -1426,7 +1451,8 @@ function GanttPage() {
                   )}
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
