@@ -8,7 +8,7 @@
 | 📅 **專案啟動** | 2026-08-22 |
 | 🔄 **最新版本** | 2026-09-01 |
 | 📦 **技術架構** | React 19 + TypeScript 7 + Vite 8 + Tailwind CSS v4 |
-| 🧪 **單元測試** | Vitest（31 tests passed：退場判定、流水帳觸發比對、模板匯出/匯入、store 退場流程） |
+| 🧪 **單元測試** | Vitest（45 tests passed：退場判定、拖曳落位、流水帳觸發比對、模板匯出/匯入、store 退場流程） |
 | 🐙 **原始碼** | [PosenChen/kanban](https://github.com/PosenChen/kanban) |
 | 📦 **資料備份倉庫** | [PosenChen/kanban-data](https://github.com/PosenChen/kanban-data)（`data/projects.json` / `milestones.json` / `todos.json` / `routines.json`） |
 
@@ -33,6 +33,7 @@
 | **標籤快速選取** | 專案/活動表單移除預填標籤，改由「工作 / 採購 / 上課…」快速選取按鈕選標籤 |
 | **專案複製** | 一鍵深層複製專案與所有子孫，名稱自動加 `Q` 後綴 |
 | **排序功能** | 父專案、子專案、待辦事項皆可 ▲▼ 重排；凍結側欄與待辦清單首尾智能隱藏箭頭 |
+| **拖曳排序** | 側欄專案（限同群組）與待辦清單直接拖曳落位，藍色插入線指示、幽靈半透明；▲▼ 保留為觸控/無障礙備用 |
 | **展開狀態持久化** | 甘特圖父子專案展開/收合狀態存入 `localStorage`，跨頁與重載保持 |
 | **深色模式** | Tailwind v4 class-based 暗色主題，light/dark/system 三檔切換，浮動切換鈕，pre-paint 防閃白 |
 | **數據同步** | LocalStorage 本地儲存 + GitHub API 雲端備份（手動/自動，3 秒去抖自動上傳） |
@@ -273,6 +274,11 @@ npm run preview
 - **永久刪除**需確認對話框；退場只標記、絕不自動刪資料
 - 甘特圖工具列 🗂️ 檔案庫入口；設定頁退場門檻日數（天）可調
 - 工程化：`store.archive.test.ts` 退場流程整合測試 — 全數 **31 tests passed**
+
+### 🗓️ 2026-09-02 — 拖曳排序
+- **專案／待辦拖曳落位**：凍結側欄與待辦清單項目直接拖曳調整順序，拖經合法目標顯示藍 2px 插入線（上半部=插其前、下半部=插其後），拖曳中來源列半透明
+- 實作：`utils/reorderUtils.ts` 純函式（`reorderToSlot`/`nextIdAfter`）＋ `hooks/useDragReorder.ts` 共用狀態機；store 新增 `moveProjectToSlot`/`moveTodoToSlot`（同群組 siblings 重排＋連續 sort_order＋GitHub 同步沿用）
+- 邊界守則：**跨群組不受理**（子專案不能拖成根／換父，無指示線）；篩選態下落點依可見清單折算；HTML5 DnD 不支援觸控 → ▲▼ 按鈕保留
 
 ---
 
