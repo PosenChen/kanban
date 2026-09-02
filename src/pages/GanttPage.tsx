@@ -5,6 +5,8 @@ import { projectStore, setStorageSource, isColorByPriority, STORAGE_KEY_COLOR_BY
 import { STATUS_CONFIG, QUICK_TAGS, WEEKDAY_LABELS, type Project, type Milestone, type Todo, type ProjectPriority, type Routine } from '@/types/project'
 import { dateToStr } from '@/utils/dateUtils'
 import { getActiveRoutines, isDoneToday, todayStr } from '@/utils/routineUtils'
+import { nextIdAfter } from '@/utils/reorderUtils'
+import { useDragReorder } from '@/hooks/useDragReorder'
 import { useTheme } from '@/utils/theme'
 import ProjectForm from '@/components/ProjectForm'
 
@@ -169,6 +171,13 @@ function GanttPage() {
   const handleMoveProjectDown = useCallback((parentId: string | null, projectId: string) => {
     moveProjectDown(parentId, projectId)
   }, [moveProjectDown])
+
+  // ── 拖曳排序：側欄專案（限同 parent_id 群組）──
+  const projDnd = useDragReorder(({ draggedId, beforeId }) => {
+    const dragged = projects.find(p => p.id === draggedId)
+    if (!dragged) return
+    projectStore.moveProjectToSlot(dragged.parent_id ?? null, draggedId, beforeId)
+  })
 
   // ── Todo reorder handlers ──
   const handleMoveTodoUp = useCallback((todoId: string) => {
@@ -1040,11 +1049,31 @@ function GanttPage() {
                 const sortParentId = isRoot ? null : project.parent_id
                 const canMoveUp = !row.isFirstSibling
                 const canMoveDown = !row.isLastSibling
+                const projDropBefore = projDnd.dropTarget?.id === project.id && projDnd.dropTarget.before
+                const projDropAfter = projDnd.dropTarget?.id === project.id && !projDnd.dropTarget.before
 
                 return (
                   <div
                     key={isRoot ? `root-${project.id}` : `sub-${project.id}`}
-                    className="flex items-center border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950"
+                    draggable
+                    onDragStart={projDnd.start(project.id)}
+                    onDragOver={e => {
+                      // 群組守則：跨群組不受理（不 preventDefault → 無指示線、不可放）
+                      const dg = projects.find(p => p.id === projDnd.draggingId)
+                      if (dg && (dg.parent_id ?? null) !== (project.parent_id ?? null)) return
+                      projDnd.over(e, project.id)
+                    }}
+                    onDragLeave={() => projDnd.leave(project.id)}
+                    onDrop={(e) => projDnd.drop(e, project.id, (overId, before, draggedId) => {
+                      if (before) return overId
+                      const sibs = projects.filter(p => (p.parent_id ?? null) === (project.parent_id ?? null) && p.id !== draggedId)
+                        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+                      return nextIdAfter(sibs, overId) // 無下一筆 → null（置末）
+                    })}
+                    onDragEnd={projDnd.clear}
+                    className={`flex items-center ${projDropAfter
+                      ? 'border-b-2 border-b-blue-500'
+                      : 'border-b border-gray-100 dark:border-gray-700'} ${projDropBefore ? 'border-t-2 border-t-blue-500' : ''} cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950 select-none ${projDnd.draggingId === project.id ? 'opacity-40' : ''}`}
                     style={{ height: rowHeight, backgroundColor: bgEven ? (dk ? '#1f2937' : '#ffffff') : (dk ? '#111827' : '#fafafa') }}
                     onClick={() => handleProjectClick(project.id)}
                   >
