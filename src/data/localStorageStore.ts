@@ -3,6 +3,7 @@ import { SAMPLE_PROJECTS_WITH_META } from './sampleData'
 import { dateToStr, formatDate } from '@/utils/dateUtils'
 import { remapAndShift, type ProjectTemplate } from '@/utils/exportUtils'
 import { isItemArchivable, selectArchivableGroups, type GroupNode } from '@/utils/archiveUtils'
+import { reorderToSlot } from '@/utils/reorderUtils'
 
 const STORAGE_KEY_DATA = 'kanban_projects'
 const STORAGE_KEY_MILESTONES = 'kanban_milestones'
@@ -580,6 +581,32 @@ export const projectStore = {
     saveTodos(todos)
     emitTodoChange()
     return updated[idx]
+  },
+
+  // ── Slot reorder（拖曳用）：插入到同層 beforeId 之前；beforeId=null → 置末 ──
+  moveProjectToSlot(parentId: string | null, draggedId: string, beforeId: string | null): void {
+    const siblings = cached.filter(p => p.parent_id === parentId)
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    const ordered = reorderToSlot(siblings, draggedId, beforeId)
+    if (ordered === siblings) return // draggedId 不在該群組 → no-op
+    ordered.forEach((sib, i) => {
+      const sIdx = cached.findIndex(p => p.id === sib.id)
+      if (sIdx !== -1) cached[sIdx] = { ...cached[sIdx], sort_order: i, updated_at: new Date().toISOString() }
+    })
+    saveLocal(cached)
+    emitProjectChange()
+  },
+
+  moveTodoToSlot(draggedId: string, beforeId: string | null): void {
+    const sorted = [...todos].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    const ordered = reorderToSlot(sorted, draggedId, beforeId)
+    if (ordered === sorted) return
+    ordered.forEach((t, i) => {
+      const tIdx = todos.findIndex(x => x.id === t.id)
+      if (tIdx !== -1) todos[tIdx] = { ...todos[tIdx], sort_order: i, updated_at: new Date().toISOString() }
+    })
+    saveTodos(todos)
+    emitTodoChange()
   },
 
   getRootProjects(): Project[] {
