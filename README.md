@@ -8,9 +8,9 @@
 | 📅 **專案啟動** | 2026-08-22 |
 | 🔄 **最新版本** | 2026-09-01 |
 | 📦 **技術架構** | React 19 + TypeScript 7 + Vite 8 + Tailwind CSS v4 |
-| 🧪 **單元測試** | Vitest（45 tests passed：退場判定、拖曳落位、流水帳觸發比對、模板匯出/匯入、store 退場流程） |
+| 🧪 **單元測試** | Vitest（52 tests passed：退場判定、拖曳落位、記帳統計、流水帳觸發比對、模板匯出/匯入、store 流程） |
 | 🐙 **原始碼** | [PosenChen/kanban](https://github.com/PosenChen/kanban) |
-| 📦 **資料備份倉庫** | [PosenChen/kanban-data](https://github.com/PosenChen/kanban-data)（`data/projects.json` / `milestones.json` / `todos.json` / `routines.json`） |
+| 📦 **資料備份倉庫** | [PosenChen/kanban-data](https://github.com/PosenChen/kanban-data)（`data/projects.json` / `milestones.json` / `todos.json` / `routines.json` / `ledger.json`） |
 
 ---
 
@@ -34,6 +34,7 @@
 | **專案複製** | 一鍵深層複製專案與所有子孫，名稱自動加 `Q` 後綴 |
 | **排序功能** | 父專案、子專案、待辦事項皆可 ▲▼ 重排；凍結側欄與待辦清單首尾智能隱藏箭頭 |
 | **拖曳排序** | 側欄專案（限同群組）與待辦清單直接拖曳落位，藍色插入線指示、幽靈半透明；▲▼ 保留為觸控/無障礙備用 |
+| **記帳（收支）** | `/ledger` 隨手記收入／支出（日期／金額／類別／備註），月度收入・支出・淨額卡＋支出分類占比条，快速類別選取，CRUD + 確認刪除 + GitHub 同步（`ledger.json`） |
 | **展開狀態持久化** | 甘特圖父子專案展開/收合狀態存入 `localStorage`，跨頁與重載保持 |
 | **深色模式** | Tailwind v4 class-based 暗色主題，light/dark/system 三檔切換，浮動切換鈕，pre-paint 防閃白 |
 | **數據同步** | LocalStorage 本地儲存 + GitHub API 雲端備份（手動/自動，3 秒去抖自動上傳） |
@@ -132,7 +133,7 @@ npm run preview
 - **GitHub API**: 在設定頁填入 Personal Access Token 後可啟用雲端同步
   - 手動下載：從 `PosenChen/kanban-data` 拉取最新資料（`kanban_storage_source = "github"` 時啟用）
   - 自動上傳：修改後 3 秒去抖自動同步至 GitHub
-  - 四個資料檔：`data/projects.json`、`data/milestones.json`、`data/todos.json`、`data/routines.json`
+  - 五個資料檔：`data/projects.json`、`data/milestones.json`、`data/todos.json`、`data/routines.json`、`data/ledger.json`
 - **載入時自動遷移**: 舊格式 `date` 自動轉為 `start_date`/`end_date`；缺失或重複的 `sort_order` 自動重排為連續值
 - **自動退場**: 載入時執行 `autoArchive()` —— 已完成且逾期 ≥ `kanban_archive_days`（預設 14 天）的物件打上 `archived_at` 標記退場至檔案庫；專案採**群組規則**（父與全部子孫都完成、以最晚結束日計），只標記、絕不刪除
 
@@ -280,6 +281,11 @@ npm run preview
 - 實作：`utils/reorderUtils.ts` 純函式（`reorderToSlot`/`nextIdAfter`）＋ `hooks/useDragReorder.ts` 共用狀態機；store 新增 `moveProjectToSlot`/`moveTodoToSlot`（同群組 siblings 重排＋連續 sort_order＋GitHub 同步沿用）
 - 邊界守則：**跨群組不受理**（子專案不能拖成根／換父，無指示線）；篩選態下落點依可見清單折算；HTML5 DnD 不支援觸控 → ▲▼ 按鈕保留
 
+### 🗓️ 2026-09-02 — 記帳（收支）
+- **`/ledger` 記帳頁**：隨手記一筆收入／支出（日期／金額／類別／備註），快速類別按鈕（餐飲／交通／工資…），點擊列編輯、✕ 確認刪除
+- **月度統計**：收入／支出／淨額三卡＋支出分類占比条；月份 ‹／›／本月切換
+- 工程：`LedgerEntry` 型別；`utils/ledgerUtils.ts` 純函式（月比對／round2／分類統計，TDD 5）；store `addLedgerEntry/getLedger/updateLedgerEntry/removeLedgerEntry`＋`kanban_ledger`＋`data/ledger.json` GitHub 同步（載入併 merge、3 秒去抖上傳）；甘特圖工具列 💰 入口 — 全數 **52 tests passed**
+
 ---
 
 ## 🗺️ Roadmap
@@ -293,6 +299,7 @@ npm run preview
 - [x] 專案模板匯出/匯入（日期重錨定，年度固定專案重用）
 - [x] 優先級篩選同步過濾待辦
 - [x] 自動退場 + 檔案庫頁（/archive：還原／永久刪除）
+- [x] 記帳（/ledger：收支＋月度統計＋GitHub 同步）
 - [ ] 待辦事項的日期關聯
 - [ ] 專案子任務管理
 - [ ] 更多視覺自訂選項
