@@ -1,4 +1,4 @@
-import type { Project, Milestone, Todo, Routine } from '@/types/project'
+import type { Project, Milestone, Todo, Routine, LedgerEntry } from '@/types/project'
 import { SAMPLE_PROJECTS_WITH_META } from './sampleData'
 import { dateToStr, formatDate } from '@/utils/dateUtils'
 import { remapAndShift, type ProjectTemplate } from '@/utils/exportUtils'
@@ -12,6 +12,7 @@ const STORAGE_KEY_TOKEN = 'kanban_github_token'
 const STORAGE_KEY_SOURCE = 'kanban_storage_source'
 export const STORAGE_KEY_COLOR_BY_PRIORITY = 'kanban_color_by_priority'
 const STORAGE_KEY_ROUTINES = 'kanban_routines'
+const STORAGE_KEY_LEDGER = 'kanban_ledger'
 const STORAGE_KEY_ARCHIVE_DAYS = 'kanban_archive_days'
 
 /** 退場門檻天數：完成且逾期達此天數才自動退場（預設 14，使用者確認 20260901）。 */
@@ -29,6 +30,7 @@ const GITHUB_PROJECTS_PATH = 'data/projects.json'
 const GITHUB_MILESTONES_PATH = 'data/milestones.json'
 const GITHUB_TODOS_PATH = 'data/todos.json'
 const GITHUB_ROUTINES_PATH = 'data/routines.json'
+const GITHUB_LEDGER_PATH = 'data/ledger.json'
 
 // ── Milestone local storage ──
 
@@ -76,6 +78,22 @@ function loadRoutines(): Routine[] {
 
 function saveRoutines(routines: Routine[]): void {
   localStorage.setItem(STORAGE_KEY_ROUTINES, JSON.stringify(routines))
+}
+
+// ── Ledger（記帳）local storage ──
+
+function loadLedger(): LedgerEntry[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_LEDGER)
+    if (!raw) return []
+    return JSON.parse(raw) as LedgerEntry[]
+  } catch {
+    return []
+  }
+}
+
+function saveLedger(ledger: LedgerEntry[]): void {
+  localStorage.setItem(STORAGE_KEY_LEDGER, JSON.stringify(ledger))
 }
 
 // ── LocalStorage (always active) ──
@@ -163,7 +181,7 @@ export async function readGitHub(token: string): Promise<Project[]> {
   return readGitHubFile(token, GITHUB_PROJECTS_PATH) as Promise<Project[]>
 }
 
-export async function writeGitHub(token: string, projects: Project[], milestones: Milestone[], todos: Todo[], routines: Routine[]): Promise<void> {
+export async function writeGitHub(token: string, projects: Project[], milestones: Milestone[], todos: Todo[], routines: Routine[], ledger: LedgerEntry[] = []): Promise<void> {
   // Write projects
   await writeGitHubFile(token, GITHUB_PROJECTS_PATH, projects)
   // Write milestones
@@ -172,6 +190,8 @@ export async function writeGitHub(token: string, projects: Project[], milestones
   await writeGitHubFile(token, GITHUB_TODOS_PATH, todos)
   // Write routines
   await writeGitHubFile(token, GITHUB_ROUTINES_PATH, routines)
+  // Write ledger
+  await writeGitHubFile(token, GITHUB_LEDGER_PATH, ledger)
 }
 
 export async function readMilestonesGitHub(token: string): Promise<Milestone[]> {
@@ -186,12 +206,17 @@ export async function readRoutinesGitHub(token: string): Promise<Routine[]> {
   return readGitHubFile(token, GITHUB_ROUTINES_PATH) as Promise<Routine[]>
 }
 
+export async function readLedgerGitHub(token: string): Promise<LedgerEntry[]> {
+  return readGitHubFile(token, GITHUB_LEDGER_PATH) as Promise<LedgerEntry[]>
+}
+
 // ── Unified store ──
 
 let cached: Project[] = []
 let milestones: Milestone[] = []
 let todos: Todo[] = []
 let routines: Routine[] = loadRoutines()
+let ledger: LedgerEntry[] = loadLedger()
 
 // Load milestones
 milestones = loadMilestones()
@@ -340,6 +365,10 @@ function emitTodoChange() {
 
 function emitRoutineChange() {
   window.dispatchEvent(new CustomEvent('kanban:routine-change', { detail: routines }))
+}
+
+function emitLedgerChange() {
+  window.dispatchEvent(new CustomEvent('kanban:ledger-change', { detail: ledger }))
 }
 
 export const projectStore = {
@@ -759,6 +788,39 @@ export const projectStore = {
     return true
   },
 
+  // ── Ledger（記帳）CRUD ──
+  addLedgerEntry(data: Omit<LedgerEntry, 'id' | 'created_at' | 'updated_at'>): LedgerEntry {
+    const nowIso = new Date().toISOString()
+    const entry: LedgerEntry = { ...data, id: `le${Date.now().toString(36)}`, created_at: nowIso, updated_at: nowIso }
+    ledger = [...ledger, entry]
+    saveLedger(ledger)
+    emitLedgerChange()
+    return entry
+  },
+
+  getLedger(): LedgerEntry[] {
+    return ledger
+  },
+
+  updateLedgerEntry(id: string, updates: Partial<LedgerEntry>): LedgerEntry | undefined {
+    const idx = ledger.findIndex(x => x.id === id)
+    if (idx === -1) return undefined
+    const updated = { ...ledger[idx], ...updates, updated_at: new Date().toISOString() }
+    ledger[idx] = updated
+    saveLedger(ledger)
+    emitLedgerChange()
+    return updated
+  },
+
+  removeLedgerEntry(id: string): boolean {
+    const idx = ledger.findIndex(x => x.id === id)
+    if (idx === -1) return false
+    ledger = ledger.filter(x => x.id !== id)
+    saveLedger(ledger)
+    emitLedgerChange()
+    return true
+  },
+
   /** 勾選/取消勾選（today=YYYY-MM-DD；隔天 completed_date 比對自然失效） */
   toggleRoutineDone(id: string, today: string): void {
     const r = routines.find(x => x.id === id)
@@ -827,6 +889,17 @@ export const projectStore = {
       }
       saveRoutines(routines)
       emitRoutineChange()
+
+      // Load ledger from GitHub
+      const loadedLedger = await readLedgerGitHub(token)
+      const existingLedgerIds = new Set(ledger.map(x => x.id))
+      for (const x of loadedLedger) {
+        if (!existingLedgerIds.has(x.id)) {
+          ledger.push(x)
+        }
+      }
+      saveLedger(ledger)
+      emitLedgerChange()
 
       emitProjectChange()
       setStorageSource('github')
@@ -1030,7 +1103,7 @@ export function scheduleGitHubSync(token: string | null, force: boolean = false)
 
   syncTimer = setTimeout(async () => {
     try {
-      await writeGitHub(token.trim(), cached, milestones, todos, routines)
+      await writeGitHub(token.trim(), cached, milestones, todos, routines, ledger)
       console.log('✅ Synced to GitHub')
     } catch (err: unknown) {
       console.warn('GitHub sync failed:', err)
