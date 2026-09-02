@@ -263,7 +263,7 @@ npm run preview
 
 ### 🗓️ 2026-09-01 — 流水帳與表單收尾、退場機制上線
 - **編輯保留排序**：編輯專案不再跳回甘特圖頂端（`sort_order` 保留）
-- 工具列語意圖示：📁 專案／🚩 活動取代通用 ＋；流水帳📒按鈕顯示完成狀態（有未勾選→紅色脈動數字徽章，全完成→翡翠勾）
+- 工具列語意圖示：📁 專案／🚩 活動取代通用 ＋；流水帳📒按鈕顯示完成狀態（有未勾選→右上角紅色圓形數字徽章（靜態），全完成→翡翠勾）
 - 篩選下拉移除冗余 ▾（原生 select 已有箭頭）
 - **自動退場（archive）核心**：`archived_at` 標記加入 Project/Todo/Milestone 三型別；`utils/archiveUtils.ts` 純函式判定（個別物件＋父含子孫群組規則，門檻 `kanban_archive_days` 預設 14 天，TDD 16 tests）；store 載入時 `autoArchive()` 一併退場，所有總覽 getter 過濾已退場項目（raw 保留 `getAllRaw`/`getArchived`）
 
