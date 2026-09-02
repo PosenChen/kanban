@@ -90,3 +90,21 @@ export interface Routine {
 
 // 星期顯示（index 0..6）
 export const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
+
+// ── Ledger（記帳／收支）──
+export type LedgerKind = 'income' | 'expense'
+
+/** 記帳一筆：amount 恆正，方向由 kind 決定 */
+export interface LedgerEntry {
+  id: string
+  date: string          // YYYY-MM-DD
+  kind: LedgerKind
+  amount: number      // > 0，單位 TWD
+  category: string    // 餐飲/交通/工資…
+  note?: string
+  created_at: string
+  updated_at: string
+}
+
+export const LEDGER_KIND_LABELS: Record<LedgerKind, string> = { income: '收入', expense: '支出' }
+export const LEDGER_QUICK_CATEGORIES = ['餐飲', '交通', '購物', '訂閱', '醫療', '工資', '獎金', '其他']
