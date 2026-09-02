@@ -75,7 +75,7 @@ describe('store archive flow', () => {
     // localStorage 落盤：archived_at 寫入且未刪除任何資料
     const persisted = JSON.parse(localStorage.getItem('kanban_projects')!)
     expect(persisted.length).toBe(5)
-    expect(persisted.find(p => p.id === 'grp').archived_at).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(persisted.find((p: { id: string; archived_at?: string }) => p.id === 'grp').archived_at).toMatch(/^\d{4}-\d{2}-\d{2}$/)
 
     // 還原子孫：祖先鏈 grp 與整棵子樹一起回總覽，不含兄弟 mixed
     projectStore.unarchiveAncestry('sub1')
