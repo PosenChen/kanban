@@ -115,16 +115,8 @@ function GanttPage() {
   const rowGroups = useMemo(() => buildRowGroups(projects), [projects])
 
   // ── View state ──
-  const [viewStart, setViewStart] = useState(dateToStr(new Date()))
-
-  // Update viewStart when projects/milestones load
-  useEffect(() => {
-    const allDates = projects.map(p => p.start_date)
-    const milestoneDates = milestones.map(m => m.start_date)
-    const all = [...allDates, ...milestoneDates]
-    const firstDate = all.reduce((min, d) => (d < min ? d : min), all[0])
-    setViewStart(prev => (firstDate < prev ? firstDate : prev))
-  }, [projects, milestones])
+  // 預設視窗自「今日 - 15 日」起：常用範圍在今日附近，不再回溯所有專案的最早起始日
+  const [viewStart, setViewStart] = useState(() => addDays(dateToStr(new Date()), -15))
 
   // ── Filter ──
   const [searchQuery, setSearchQuery] = useState('')
