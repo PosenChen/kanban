@@ -1,4 +1,4 @@
-import type { Project, Milestone, Todo, Routine, LedgerEntry } from '@/types/project'
+import type { Project, Milestone, Todo, Routine, LedgerEntry, Memo } from '@/types/project'
 import { SAMPLE_PROJECTS_WITH_META } from './sampleData'
 import { dateToStr, formatDate } from '@/utils/dateUtils'
 import { remapAndShift, type ProjectTemplate } from '@/utils/exportUtils'
@@ -13,6 +13,7 @@ const STORAGE_KEY_SOURCE = 'kanban_storage_source'
 export const STORAGE_KEY_COLOR_BY_PRIORITY = 'kanban_color_by_priority'
 const STORAGE_KEY_ROUTINES = 'kanban_routines'
 const STORAGE_KEY_LEDGER = 'kanban_ledger'
+const STORAGE_KEY_MEMOS = 'kanban_memos'
 const STORAGE_KEY_ARCHIVE_DAYS = 'kanban_archive_days'
 
 /** 退場門檻天數：完成且逾期達此天數才自動退場（預設 14，使用者確認 20260901）。 */
@@ -31,6 +32,7 @@ const GITHUB_MILESTONES_PATH = 'data/milestones.json'
 const GITHUB_TODOS_PATH = 'data/todos.json'
 const GITHUB_ROUTINES_PATH = 'data/routines.json'
 const GITHUB_LEDGER_PATH = 'data/ledger.json'
+const GITHUB_MEMOS_PATH = 'data/memos.json'
 
 // ── Milestone local storage ──
 
@@ -94,6 +96,22 @@ function loadLedger(): LedgerEntry[] {
 
 function saveLedger(ledger: LedgerEntry[]): void {
   localStorage.setItem(STORAGE_KEY_LEDGER, JSON.stringify(ledger))
+}
+
+// ── Memo（備忘錄）local storage ──
+
+function loadMemos(): Memo[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_MEMOS)
+    if (!raw) return []
+    return JSON.parse(raw) as Memo[]
+  } catch {
+    return []
+  }
+}
+
+function saveMemos(memos: Memo[]): void {
+  localStorage.setItem(STORAGE_KEY_MEMOS, JSON.stringify(memos))
 }
 
 // ── LocalStorage (always active) ──
@@ -181,7 +199,7 @@ export async function readGitHub(token: string): Promise<Project[]> {
   return readGitHubFile(token, GITHUB_PROJECTS_PATH) as Promise<Project[]>
 }
 
-export async function writeGitHub(token: string, projects: Project[], milestones: Milestone[], todos: Todo[], routines: Routine[], ledger: LedgerEntry[] = []): Promise<void> {
+export async function writeGitHub(token: string, projects: Project[], milestones: Milestone[], todos: Todo[], routines: Routine[], ledger: LedgerEntry[] = [], memos: Memo[] = []): Promise<void> {
   // Write projects
   await writeGitHubFile(token, GITHUB_PROJECTS_PATH, projects)
   // Write milestones
@@ -192,6 +210,8 @@ export async function writeGitHub(token: string, projects: Project[], milestones
   await writeGitHubFile(token, GITHUB_ROUTINES_PATH, routines)
   // Write ledger
   await writeGitHubFile(token, GITHUB_LEDGER_PATH, ledger)
+  // Write memos
+  await writeGitHubFile(token, GITHUB_MEMOS_PATH, memos)
 }
 
 export async function readMilestonesGitHub(token: string): Promise<Milestone[]> {
@@ -210,6 +230,10 @@ export async function readLedgerGitHub(token: string): Promise<LedgerEntry[]> {
   return readGitHubFile(token, GITHUB_LEDGER_PATH) as Promise<LedgerEntry[]>
 }
 
+export async function readMemosGitHub(token: string): Promise<Memo[]> {
+  return readGitHubFile(token, GITHUB_MEMOS_PATH) as Promise<Memo[]>
+}
+
 // ── Unified store ──
 
 let cached: Project[] = []
@@ -217,6 +241,7 @@ let milestones: Milestone[] = []
 let todos: Todo[] = []
 let routines: Routine[] = loadRoutines()
 let ledger: LedgerEntry[] = loadLedger()
+let memos: Memo[] = loadMemos()
 
 // Load milestones
 milestones = loadMilestones()
@@ -369,6 +394,10 @@ function emitRoutineChange() {
 
 function emitLedgerChange() {
   window.dispatchEvent(new CustomEvent('kanban:ledger-change', { detail: ledger }))
+}
+
+function emitMemoChange() {
+  window.dispatchEvent(new CustomEvent('kanban:memo-change', { detail: memos }))
 }
 
 export const projectStore = {
@@ -821,6 +850,39 @@ export const projectStore = {
     return true
   },
 
+  // ── Memo（備忘錄）CRUD ──
+  addMemo(data: Omit<Memo, 'id' | 'created_at' | 'updated_at'>): Memo {
+    const nowIso = new Date().toISOString()
+    const memo: Memo = { ...data, id: `me${Date.now().toString(36)}`, created_at: nowIso, updated_at: nowIso }
+    memos = [...memos, memo]
+    saveMemos(memos)
+    emitMemoChange()
+    return memo
+  },
+
+  getMemos(): Memo[] {
+    return memos
+  },
+
+  updateMemo(id: string, updates: Partial<Memo>): Memo | undefined {
+    const idx = memos.findIndex(x => x.id === id)
+    if (idx === -1) return undefined
+    const updated = { ...memos[idx], ...updates, updated_at: new Date().toISOString() }
+    memos[idx] = updated
+    saveMemos(memos)
+    emitMemoChange()
+    return updated
+  },
+
+  removeMemo(id: string): boolean {
+    const idx = memos.findIndex(x => x.id === id)
+    if (idx === -1) return false
+    memos = memos.filter(x => x.id !== id)
+    saveMemos(memos)
+    emitMemoChange()
+    return true
+  },
+
   /** 勾選/取消勾選（today=YYYY-MM-DD；隔天 completed_date 比對自然失效） */
   toggleRoutineDone(id: string, today: string): void {
     const r = routines.find(x => x.id === id)
@@ -900,6 +962,17 @@ export const projectStore = {
       }
       saveLedger(ledger)
       emitLedgerChange()
+
+      // Load memos from GitHub
+      const loadedMemos = await readMemosGitHub(token)
+      const existingMemoIds = new Set(memos.map(x => x.id))
+      for (const x of loadedMemos) {
+        if (!existingMemoIds.has(x.id)) {
+          memos.push(x)
+        }
+      }
+      saveMemos(memos)
+      emitMemoChange()
 
       emitProjectChange()
       setStorageSource('github')
@@ -1103,7 +1176,7 @@ export function scheduleGitHubSync(token: string | null, force: boolean = false)
 
   syncTimer = setTimeout(async () => {
     try {
-      await writeGitHub(token.trim(), cached, milestones, todos, routines, ledger)
+      await writeGitHub(token.trim(), cached, milestones, todos, routines, ledger, memos)
       console.log('✅ Synced to GitHub')
     } catch (err: unknown) {
       console.warn('GitHub sync failed:', err)
