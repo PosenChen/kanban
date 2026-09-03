@@ -74,15 +74,29 @@ function ProjectDetailPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Back button */}
-      <button
-        onClick={() => navigate('/')}
-        className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        返回總覽
-      </button>
+      <div className="flex items-center gap-4">
+        <button
+          onClick={() => navigate('/')}
+          className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          返回總覽
+        </button>
+        {project.parent_id && (() => {
+          const parent = getById(project.parent_id)
+          return (
+            <button
+              onClick={() => navigate(`/project/${project.parent_id}`)}
+              className="flex items-center gap-1 text-sm text-blue-500 hover:text-blue-700 dark:hover:text-blue-400"
+              title={`返回上層：${parent?.name ?? '父專案'}`}
+            >
+              ↳ 返回父專案{parent ? `：${parent.name}` : ''}
+            </button>
+          )
+        })()}
+      </div>
 
       {/* Header */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
