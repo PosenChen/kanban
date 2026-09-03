@@ -108,3 +108,17 @@ export interface LedgerEntry {
 
 export const LEDGER_KIND_LABELS: Record<LedgerKind, string> = { income: '收入', expense: '支出' }
 export const LEDGER_QUICK_CATEGORIES = ['餐飲', '交通', '購物', '訂閱', '醫療', '工資', '獎金', '其他']
+
+// ── Memo（備忘錄／便條）──
+export interface Memo {
+  id: string
+  title: string       // 簡短標題（沒填時由內文截斷補）
+  content: string     // 內文（可空）；title/content 至少一非空
+  tags: string[]
+  date: string        // YYYY-MM-DD 記錄日（預設今日）
+  pinned?: boolean    // 置頂
+  created_at: string
+  updated_at: string
+}
+
+export const MEMO_QUICK_TAGS = ['待跟進', '靈感', '電話', '約', '帳務', '其他']
