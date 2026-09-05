@@ -1,10 +1,11 @@
-import type { Project, Milestone, Todo, Routine, LedgerEntry, Memo } from '@/types/project'
+import type { Project, Milestone, Todo, Routine, LedgerEntry, Memo, Topic, TopicStatus } from '@/types/project'
 import { SAMPLE_PROJECTS_WITH_META } from './sampleData'
 import { dateToStr, formatDate } from '@/utils/dateUtils'
 import { remapAndShift, type ProjectTemplate } from '@/utils/exportUtils'
 import { isItemArchivable, selectArchivableGroups, type GroupNode } from '@/utils/archiveUtils'
 import { reorderToSlot } from '@/utils/reorderUtils'
 import { shouldSkipEmptyUpload } from '@/utils/syncGuardUtils'
+import { todayTopic, claimTopic, releaseTopic, completeTopic, swapPoolOrder, reorderPoolAfterRemove } from '@/utils/topicUtils'
 
 const STORAGE_KEY_DATA = 'kanban_projects'
 const STORAGE_KEY_MILESTONES = 'kanban_milestones'
@@ -14,6 +15,7 @@ const STORAGE_KEY_SOURCE = 'kanban_storage_source'
 const STORAGE_KEY_ROUTINES = 'kanban_routines'
 const STORAGE_KEY_LEDGER = 'kanban_ledger'
 const STORAGE_KEY_MEMOS = 'kanban_memos'
+const STORAGE_KEY_TOPICS = 'kanban_topics'
 const STORAGE_KEY_ARCHIVE_DAYS = 'kanban_archive_days'
 
 /** 退場門檻天數：完成且逾期達此天數才自動退場（預設 14，使用者確認 20260901）。 */
@@ -28,6 +30,7 @@ const GITHUB_TODOS_PATH = 'data/todos.json'
 const GITHUB_ROUTINES_PATH = 'data/routines.json'
 const GITHUB_LEDGER_PATH = 'data/ledger.json'
 const GITHUB_MEMOS_PATH = 'data/memos.json'
+const GITHUB_TOPICS_PATH = 'data/topics.json'
 
 // ── Milestone local storage ──
 
@@ -107,6 +110,32 @@ function loadMemos(): Memo[] {
 
 function saveMemos(memos: Memo[]): void {
   localStorage.setItem(STORAGE_KEY_MEMOS, JSON.stringify(memos))
+}
+
+// ── Topic（選題庫）local storage ──
+
+function loadTopics(): Topic[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_TOPICS)
+    if (!raw) return []
+    const arr = JSON.parse(raw) as Topic[]
+    // migration: 補缺失/重複 sort_order → 依 added_date 稳定排序重排連續
+    let next = 0
+    const seen = new Set<number>()
+    return arr.map((t, i) => {
+      const so = typeof t.sort_order === 'number' && !seen.has(t.sort_order) ? t.sort_order : next
+      seen.add(so)
+      next = Math.max(next, so) + 1
+      return { ...t, sort_order: so, _i: i } as any
+    }).sort((a: any, b: any) => a.sort_order - b.sort_order || a._i - b._i)
+      .map((t: any) => { const { _i, ...rest } = t; return rest as Topic })
+  } catch {
+    return []
+  }
+}
+
+function saveTopics(topics: Topic[]): void {
+  localStorage.setItem(STORAGE_KEY_TOPICS, JSON.stringify(topics))
 }
 
 // ── LocalStorage (always active) ──
@@ -219,7 +248,7 @@ export async function readGitHub(token: string): Promise<Project[]> {
   return readGitHubFile(token, GITHUB_PROJECTS_PATH) as Promise<Project[]>
 }
 
-export async function writeGitHub(token: string, projects: Project[], milestones: Milestone[], todos: Todo[], routines: Routine[], ledger: LedgerEntry[] = [], memos: Memo[] = [], opts: { force?: boolean } = {}): Promise<{ uploaded: string[]; skipped: string[] }> {
+export async function writeGitHub(token: string, projects: Project[], milestones: Milestone[], todos: Todo[], routines: Routine[], ledger: LedgerEntry[] = [], memos: Memo[] = [], topics: Topic[] = [], opts: { force?: boolean } = {}): Promise<{ uploaded: string[]; skipped: string[] }> {
   const files: [string, unknown[]][] = [
     [GITHUB_PROJECTS_PATH, projects],
     [GITHUB_MILESTONES_PATH, milestones],
@@ -227,6 +256,7 @@ export async function writeGitHub(token: string, projects: Project[], milestones
     [GITHUB_ROUTINES_PATH, routines],
     [GITHUB_LEDGER_PATH, ledger],
     [GITHUB_MEMOS_PATH, memos],
+    [GITHUB_TOPICS_PATH, topics],
   ]
   const uploaded: string[] = []
   const skipped: string[] = []
@@ -268,6 +298,10 @@ export async function readMemosGitHub(token: string): Promise<Memo[]> {
   return readGitHubFile(token, GITHUB_MEMOS_PATH) as Promise<Memo[]>
 }
 
+export async function readTopicsGitHub(token: string): Promise<Topic[]> {
+  return readGitHubFile(token, GITHUB_TOPICS_PATH) as Promise<Topic[]>
+}
+
 // ── Unified store ──
 
 let cached: Project[] = []
@@ -276,6 +310,7 @@ let todos: Todo[] = []
 let routines: Routine[] = loadRoutines()
 let ledger: LedgerEntry[] = loadLedger()
 let memos: Memo[] = loadMemos()
+let topics: Topic[] = loadTopics()
 
 // Load milestones
 milestones = loadMilestones()
@@ -432,6 +467,10 @@ function emitLedgerChange() {
 
 function emitMemoChange() {
   window.dispatchEvent(new CustomEvent('kanban:memo-change', { detail: memos }))
+}
+
+function emitTopicChange() {
+  window.dispatchEvent(new CustomEvent('kanban:topic-change', { detail: topics }))
 }
 
 export const projectStore = {
@@ -917,6 +956,68 @@ export const projectStore = {
     return true
   },
 
+  // ── Topic（選題庫）CRUD ──
+  addTopic(data: Omit<Topic, 'id' | 'created_at' | 'updated_at' | 'status'> & { status?: TopicStatus }): Topic {
+    const nowIso = new Date().toISOString()
+    const topic: Topic = { ...data, status: data.status ?? 'pool', id: `tp${Date.now().toString(36)}`, created_at: nowIso, updated_at: nowIso }
+    topics = [...topics, topic]
+    saveTopics(topics)
+    emitTopicChange()
+    return topic
+  },
+
+  getTopics(): Topic[] {
+    return topics
+  },
+
+  todayTopic(): Topic | null {
+    return todayTopic(topics)
+  },
+
+  claimTopic(id: string): Topic | undefined {
+    const t = topics.find(x => x.id === id)
+    if (!t) return undefined
+    return this.updateTopic(id, claimTopic(t))
+  },
+
+  releaseTopic(id: string): Topic | undefined {
+    const t = topics.find(x => x.id === id)
+    if (!t) return undefined
+    return this.updateTopic(id, releaseTopic(t))
+  },
+
+  completeTopic(id: string, date: string): Topic | undefined {
+    const t = topics.find(x => x.id === id)
+    if (!t) return undefined
+    return this.updateTopic(id, completeTopic(t, date))
+  },
+
+  /** 池內調序（dir=-1 上移 / 1 下移），整池 sort_order 重排連續 */
+  moveTopic(id: string, dir: -1 | 1): void {
+    topics = swapPoolOrder(topics, id, dir)
+    saveTopics(topics)
+    emitTopicChange()
+  },
+
+  removeTopic(id: string): boolean {
+    const idx = topics.findIndex(x => x.id === id)
+    if (idx === -1) return false
+    topics = reorderPoolAfterRemove(topics, id)
+    saveTopics(topics)
+    emitTopicChange()
+    return true
+  },
+
+  updateTopic(id: string, patch: Partial<Topic>): Topic | undefined {
+    const idx = topics.findIndex(x => x.id === id)
+    if (idx === -1) return undefined
+    const updated = { ...topics[idx], ...patch, id, updated_at: new Date().toISOString() }
+    topics[idx] = updated
+    saveTopics(topics)
+    emitTopicChange()
+    return updated
+  },
+
   /** 勾選/取消勾選（today=YYYY-MM-DD；隔天 completed_date 比對自然失效） */
   toggleRoutineDone(id: string, today: string): void {
     const r = routines.find(x => x.id === id)
@@ -1007,6 +1108,17 @@ export const projectStore = {
       }
       saveMemos(memos)
       emitMemoChange()
+
+      // Load topics from GitHub
+      const loadedTopics = await readTopicsGitHub(token)
+      const existingTopicIds = new Set(topics.map(x => x.id))
+      for (const x of loadedTopics) {
+        if (!existingTopicIds.has(x.id)) {
+          topics.push(x)
+        }
+      }
+      saveTopics(topics)
+      emitTopicChange()
 
       emitProjectChange()
       setStorageSource('github')
@@ -1171,10 +1283,12 @@ export const projectStore = {
     milestones = loadMilestones()
     todos = loadTodos()
     routines = loadRoutines()
+    topics = loadTopics()
     emitProjectChange()
     emitMilestoneChange()
     emitTodoChange()
     emitRoutineChange()
+    emitTopicChange()
   },
 }
 
@@ -1198,6 +1312,10 @@ window.addEventListener('storage', (e) => {
     routines = loadRoutines()
     emitRoutineChange()
   }
+  if (e.key === STORAGE_KEY_TOPICS) {
+    topics = loadTopics()
+    emitTopicChange()
+  }
 })
 
 // ── GitHub sync (debounced 3s) ──
@@ -1215,12 +1333,12 @@ function emitSyncStatus(detail: SyncEventDetail) {
 }
 
 export function getLocalCounts() {
-  return { projects: cached.length, milestones: milestones.length, todos: todos.length, routines: routines.length, ledger: ledger.length, memos: memos.length }
+  return { projects: cached.length, milestones: milestones.length, todos: todos.length, routines: routines.length, ledger: ledger.length, memos: memos.length, topics: topics.length }
 }
 
 export async function pushToGitHub(token: string, force = false): Promise<SyncEventDetail> {
   try {
-    const { uploaded, skipped } = await writeGitHub(token, cached, milestones, todos, routines, ledger, memos, { force })
+    const { uploaded, skipped } = await writeGitHub(token, cached, milestones, todos, routines, ledger, memos, topics, { force })
     if (skipped.length > 0) {
       console.warn(`[sync] skipped (empty-overwrite guard): ${skipped.join(', ')}`)
     }
@@ -1235,7 +1353,7 @@ export async function pushToGitHub(token: string, force = false): Promise<SyncEv
 export async function fetchRemoteCounts(token: string): Promise<Record<keyof ReturnType<typeof getLocalCounts>, number>> {
   const paths: [keyof ReturnType<typeof getLocalCounts>, string][] = [
     ['projects', GITHUB_PROJECTS_PATH], ['milestones', GITHUB_MILESTONES_PATH], ['todos', GITHUB_TODOS_PATH],
-    ['routines', GITHUB_ROUTINES_PATH], ['ledger', GITHUB_LEDGER_PATH], ['memos', GITHUB_MEMOS_PATH],
+    ['routines', GITHUB_ROUTINES_PATH], ['ledger', GITHUB_LEDGER_PATH], ['memos', GITHUB_MEMOS_PATH], ['topics', GITHUB_TOPICS_PATH],
   ]
   const out = {} as Record<keyof ReturnType<typeof getLocalCounts>, number>
   await Promise.all(paths.map(async ([key, path]) => {
