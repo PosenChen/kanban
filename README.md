@@ -6,7 +6,7 @@
 |------|------|
 | 🌐 **部署站點** | [posenchen.github.io/kanban](https://posenchen.github.io/kanban/) |
 | 📅 **專案啟動** | 2026-08-22 |
-| 🔄 **最新版本** | 2026-09-01 |
+| 🔄 **最新版本** | 2026-09-03 |
 | 📦 **技術架構** | React 19 + TypeScript 7 + Vite 8 + Tailwind CSS v4 |
 | 🧪 **單元測試** | Vitest（59 tests passed：退場判定、拖曳落位、記帳統計、備忘篩選、流水帳觸發比對、模板匯出/匯入、store 流程） |
 | 🐙 **原始碼** | [PosenChen/kanban](https://github.com/PosenChen/kanban) |
@@ -51,7 +51,7 @@
 - **樣式**: Tailwind CSS v4.3 (`@tailwindcss/vite`) + 自繪 SVG 甘特圖（不依賴 frappe-gantt 渲染元件）
 - **狀態管理**: React hooks (`useProjects`) + `kanban:data-change` CustomEvent 驅動重繪
 - **數據持久化**: LocalStorage + GitHub Content API (PosenChen/kanban-data)
-- **單元測試**: Vitest（`src/utils/*.test.ts`：流水帳觸發比對、模板組裝/重掛/偏移）
+- **單元測試**: Vitest（10 test files / 59 tests：退場判定、拖曳落位重排、流水帳觸發、記帳統計、備忘篩選、模板匯出/匯入、store 整合流程）
 - **部署**: GitHub Pages (GitHub Actions CI/CD: build → upload-pages-artifact → deploy-pages)
 
 ---
@@ -68,15 +68,19 @@ kanban/
 ├── .github/workflows/deploy.yml  # GitHub Actions CI/CD
 ├── dist/                     # 構建輸出（供靜態部署參考）
 └── src/
-    ├── App.tsx               # 主應用路由 + 全域 ThemeToggle
+    ├── App.tsx               # 主應用路由（/ /board /project/:id /daily/:date? /ledger /memo /archive /settings）+ 全域 ThemeToggle
     ├── types/
-    │   └── project.ts        # 資料型別 (Project, Milestone, Todo, Routine, ProjectTemplate) + 狀態/優先級設定
+    │   └── project.ts        # 資料型別 (Project, Milestone, Todo, Routine, LedgerEntry, Memo, ProjectTemplate) + 狀態/優先級設定
     ├── data/
     │   ├── localStorageStore.ts  # 資料持久化（LocalStorage + GitHub API 同步 + migration + 模板匯入 + 自動退場）
     │   ├── store.archive.test.ts # store 退場流程整合測試（1 test）
+    │   ├── store.reorder.test.ts # store 拖曳落位測試（6 tests）
+    │   ├── store.ledger.test.ts  # store 記帳 CRUD 測試（2 tests）
+    │   ├── store.memo.test.ts    # store 備忘 CRUD 測試（2 tests）
     │   └── sampleData.ts       # 示範資料
     ├── hooks/
-    │   └── useProjects.ts      # React hook wrapper（暴露 store CRUD/排序方法）
+    │   ├── useProjects.ts      # React hook wrapper（暴露 store CRUD/排序方法）
+    │   └── useDragReorder.ts   # 列表拖曳共用狀態機（插入線/幽靈/落位）
     ├── utils/
     │   ├── dateUtils.ts        # 日期工具函數
     │   ├── theme.ts            # 主題管理（localStorage['kanban_theme'] + useTheme hook）
@@ -84,6 +88,12 @@ kanban/
     │   ├── routineUtils.test.ts    # 流水帳單元測試（9 tests）
     │   ├── archiveUtils.ts        # 退場判定純函式（個別物件 / 父＋子孫群組，門檻日數）
     │   ├── archiveUtils.test.ts    # 退場判定單元測試（16 tests）
+    │   ├── reorderUtils.ts      # 拖曳落位純函式（reorderToSlot/nextIdAfter）
+    │   ├── reorderUtils.test.ts    # 落位單元測試（14 tests）
+    │   ├── ledgerUtils.ts       # 記帳月比對／round2／分類統計
+    │   ├── ledgerUtils.test.ts     # 記帳單元測試（5 tests）
+    │   ├── memoUtils.ts         # 備忘篩選純函式（關鍵字/標籤/置頂排序）
+    │   ├── memoUtils.test.ts       # 備忘單元測試（5 tests）
     │   ├── exportUtils.ts      # 專案模板組裝/匯出 + Word HTML builder
     │   └── exportUtils.test.ts     # 模板單元測試（5 tests）
     ├── components/
@@ -94,10 +104,12 @@ kanban/
     ├── layouts/
     │   └── MainLayout.tsx      # 導航列
     ├── pages/
-    │   ├── GanttPage.tsx       # 甘特圖總覽頁（~1460 行：凍結側欄/SVG 渲染/拖曳編輯/活動與待辦 CRUD）
+    │   ├── GanttPage.tsx       # 甘特圖總覽頁（~1840 行：凍結側欄/SVG 渲染/拖曳編輯/拖曳排序/活動與待辦 CRUD）
     │   ├── KanbanBoard.tsx     # 看板頁面（四欄）
     │   ├── DailyPage.tsx       # 日曆詳細頁（響應式三欄）
-    │   ├── ProjectDetailPage.tsx  # 專案詳細頁
+    │   ├── ProjectDetailPage.tsx  # 專案詳細頁（含返回父專案）
+    │   ├── LedgerPage.tsx      # 記帳頁（/ledger：收支＋月度統計）
+    │   ├── MemoPage.tsx        # 備忘錄頁（/memo：便條＋搜尋＋標籤＋📌 置頂）
     │   ├── ArchivePage.tsx     # 檔案庫頁（/archive：按月分組、還原／永久刪除）
     │   └── SettingsPage.tsx    # 設定與同步（含退場門檻日數）
     └── main.tsx
@@ -130,7 +142,7 @@ npm run preview
 
 ## 🔄 數據同步
 
-- **LocalStorage**: 預設使用瀏覽器本地儲存（keys: `kanban_projects` / `kanban_milestones` / `kanban_todos` / `kanban_routines`），所有修改即時生效
+- **LocalStorage**: 預設使用瀏覽器本地儲存（keys: `kanban_projects` / `kanban_milestones` / `kanban_todos` / `kanban_routines` / `kanban_ledger` / `kanban_memos`），所有修改即時生效
 - **GitHub API**: 在設定頁填入 Personal Access Token 後可啟用雲端同步
   - 手動下載：從 `PosenChen/kanban-data` 拉取最新資料（`kanban_storage_source = "github"` 時啟用）
   - 自動上傳：修改後 3 秒去抖自動同步至 GitHub
@@ -197,6 +209,28 @@ npm run preview
 | created_at / updated_at | string | ISO-8601 時間戳 |
 
 > 觸發語意：同一維度內 OR、跨維度 OR、全空條件 = 永不出現。
+
+### LedgerEntry（記帳／收支）
+| 欄位 | 類型 | 說明 |
+|------|------|------|
+| id | string | 唯一識別碼 |
+| date | string | 日期 (YYYY-MM-DD) |
+| kind | LedgerKind | `income` 收入／`expense` 支出 |
+| amount | number | 金額 > 0，單位 TWD |
+| category | string | 類別（餐飲/交通/工資…，快速選取按鈕） |
+| note? | string | 備註 |
+| created_at / updated_at | string | ISO-8601 時間戳 |
+
+### Memo（備忘錄／便條）
+| 欄位 | 類型 | 說明 |
+|------|------|------|
+| id | string | 唯一識別碼 |
+| title | string | 簡短標題（沒填時由內文截斷補） |
+| content | string | 內文（可空）；title/content 至少一非空 |
+| tags | string[] | 標籤陣列（待跟進/靈感/電話…快速選取） |
+| date | string | 記錄日 (YYYY-MM-DD，預設今日) |
+| pinned? | boolean | 📌 置頂 |
+| created_at / updated_at | string | ISO-8601 時間戳 |
 
 ### ProjectTemplate（專案模板）
 | 欄位 | 類型 | 說明 |
@@ -318,4 +352,4 @@ MIT
 
 ---
 
-*最後更新：2026-09-03*
+*最後更新：2026-09-05*
