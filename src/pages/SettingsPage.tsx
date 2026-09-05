@@ -143,9 +143,9 @@ function SettingsPage() {
     // 上傳前先拉雲端筆數，確認對話框顯示「本地/雲端」比對，防誤清空
     const local = getLocalCounts()
     const remote = await fetchRemoteCounts(token.trim())
-    const labels = ['專案', '活動', '待辦', '流水帳', '記帳', '備忘']
-    const lc = [local.projects, local.milestones, local.todos, local.routines, local.ledger, local.memos]
-    const rc = [remote.projects, remote.milestones, remote.todos, remote.routines, remote.ledger, remote.memos]
+    const labels = ['專案', '活動', '待辦', '流水帳', '記帳', '備忘', '選題']
+    const lc = [local.projects, local.milestones, local.todos, local.routines, local.ledger, local.memos, local.topics]
+    const rc = [remote.projects, remote.milestones, remote.todos, remote.routines, remote.ledger, remote.memos, remote.topics]
     const zeroOverwrite = labels.filter((_, i) => lc[i] === 0 && rc[i] > 0)
     let msg = `上傳（覆蓋）到 GitHub？\n比對 本地/雲端：\n${formatCountSummary(labels, lc, rc)}`
     if (zeroOverwrite.length > 0) {

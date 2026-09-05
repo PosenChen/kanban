@@ -5,6 +5,7 @@ import DailyPage from './pages/DailyPage'
 import ArchivePage from './pages/ArchivePage'
 import LedgerPage from './pages/LedgerPage'
 import MemoPage from './pages/MemoPage'
+import TopicsPage from './pages/TopicsPage'
 import SettingsPage from './pages/SettingsPage'
 import KanbanBoard from './pages/KanbanBoard'
 import ThemeToggle from './components/ThemeToggle'
@@ -19,6 +20,7 @@ function App() {
         <Route path="/daily/:date?" element={<DailyPage />} />
         <Route path="/ledger" element={<LedgerPage />} />
         <Route path="/memo" element={<MemoPage />} />
+        <Route path="/topics" element={<TopicsPage />} />
         <Route path="/archive" element={<ArchivePage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Routes>

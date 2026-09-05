@@ -39,11 +39,11 @@ export function swapPoolOrder(pool: Topic[], id: string, dir: -1 | 1): Topic[] {
   return [...pool.filter(t => !relIds.has(t.id)), ...rel]
 }
 
-/** 刪池內一題後，其餘 pool 重排連續 sort_order（傳回整池新陣列） */
+/** 刪池內一題後，其餘 pool 重排連續 sort_order；writing/done 原樣保留（傳回整池新陣列） */
 export function reorderPoolAfterRemove(pool: Topic[], removedId: string): Topic[] {
   const keptPool = pool.filter(t => t.id !== removedId && t.status === 'pool')
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((t, i) => ({ ...t, sort_order: i }))
-  const poolIds = new Set(keptPool.map(t => t.id))
-  return [...pool.filter(t => !poolIds.has(t.id) && t.id !== removedId), ...keptPool]
+  const keptOthers = pool.filter(t => t.id !== removedId && t.status !== 'pool')
+  return [...keptOthers, ...keptPool]
 }

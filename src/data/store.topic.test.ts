@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest'
+import type { Topic } from '@/types/project'
 
 function installShim() {
   const store = new Map<string, string>()
@@ -52,9 +53,9 @@ describe('topic store flow', () => {
     const c = projectStore.addTopic({ title: 'C 題', tags: [], sort_order: 9, added_date: '2026-09-02' })
     const d = projectStore.addTopic({ title: 'D 題', tags: [], sort_order: 12, added_date: '2026-09-02' })
     projectStore.removeTopic(c.id)
-    const pool = projectStore.getTopics().filter(t => t.status === 'pool')
+    const pool = projectStore.getTopics().filter((t: Topic) => t.status === 'pool')
     expect(pool.map(t => t.sort_order)).toEqual([0])
-    expect(JSON.parse(localStorage.getItem('kanban_topics')!).find(t => t.id === d.id).sort_order).toBe(0)
+    expect(JSON.parse(localStorage.getItem('kanban_topics')!).find((t: Topic) => t.id === d.id).sort_order).toBe(0)
   })
 
   it('kanban:topic-change fired on add', () => {

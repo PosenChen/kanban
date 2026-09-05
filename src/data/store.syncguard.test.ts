@@ -56,7 +56,7 @@ describe('writeGitHub empty-overwrite guard (mocked fetch)', () => {
       const { uploaded, skipped } = await writeGitHub('tok', [], [], [], [], [], [])
       // every file locally empty, cloud non-empty → all skipped, zero PUT
       expect(uploaded).toHaveLength(0)
-      expect(skipped).toHaveLength(6)
+      expect(skipped).toHaveLength(7) // 七檔（含 topics）本地全空、雲端非空 → 全跳過
       expect(calls.filter(c => c.method === 'PUT')).toHaveLength(0)
     } finally {
       global.fetch = origFetch

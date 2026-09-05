@@ -959,7 +959,7 @@ export const projectStore = {
   // ── Topic（選題庫）CRUD ──
   addTopic(data: Omit<Topic, 'id' | 'created_at' | 'updated_at' | 'status'> & { status?: TopicStatus }): Topic {
     const nowIso = new Date().toISOString()
-    const topic: Topic = { ...data, status: data.status ?? 'pool', id: `tp${Date.now().toString(36)}`, created_at: nowIso, updated_at: nowIso }
+    const topic: Topic = { ...data, status: data.status ?? 'pool', id: `tp${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, created_at: nowIso, updated_at: nowIso }
     topics = [...topics, topic]
     saveTopics(topics)
     emitTopicChange()

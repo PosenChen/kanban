@@ -958,6 +958,9 @@ function GanttPage() {
             <Link to="/memo" className="flex items-center gap-1 px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors" title="備忘錄">
               📝 備忘
             </Link>
+            <Link to="/topics" className="flex items-center gap-1 px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors" title="選題庫（每日一文）">
+              📚 選題
+            </Link>
             <Link to="/ledger" className="flex items-center gap-1 px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors" title="收支記帳">
               💰 記帳
             </Link>
