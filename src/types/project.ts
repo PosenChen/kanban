@@ -122,3 +122,22 @@ export interface Memo {
 }
 
 export const MEMO_QUICK_TAGS = ['待跟進', '靈感', '電話', '約', '帳務', '其他']
+
+// ── Topic（選題庫／每日一文）──
+export type TopicStatus = 'pool' | 'writing' | 'done'
+
+export interface Topic {
+  id: string
+  title: string          // 主題（必填）
+  outline?: string      // 可選大綱／靈感正文
+  tags: string[]
+  status: TopicStatus   // pool 儲備 / writing 撰寫中（黏住今日題）/ done 已交卷
+  sort_order: number    // 池內輪流順序（0 = 隊首，先寫）
+  added_date: string    // YYYY-MM-DD 入庫日
+  done_date?: string    // YYYY-MM-DD 交卷日；undefined = 未交卷
+  created_at: string
+  updated_at: string
+}
+
+export const TOPIC_QUICK_TAGS = ['散文', '技術', '隨筆', '評論', '教學', '其他']
+export const TOPIC_STATUS_LABELS: Record<TopicStatus, string> = { pool: '儲備', writing: '撰寫中', done: '已完成' }
