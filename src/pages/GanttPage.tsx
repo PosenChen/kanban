@@ -116,8 +116,8 @@ function GanttPage() {
   const rowGroups = useMemo(() => buildRowGroups(projects), [projects])
 
   // ── View state ──
-  // 預設視窗自「今日 - 15 日」起：常用範圍在今日附近，不再回溯所有專案的最早起始日
-  const [viewStart, setViewStart] = useState(() => addDays(dateToStr(new Date()), -15))
+  // 預設視窗自「今日 - 6 日」起：手機（約可見 11 日欄）也能同日看見今日與整週過往
+  const [viewStart, setViewStart] = useState(() => addDays(dateToStr(new Date()), -6))
 
   // ── Filter ──
   const [searchQuery, setSearchQuery] = useState('')
