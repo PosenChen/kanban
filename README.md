@@ -8,9 +8,9 @@
 | 📅 **專案啟動** | 2026-08-22 |
 | 🔄 **最新版本** | 2026-09-03 |
 | 📦 **技術架構** | React 19 + TypeScript 7 + Vite 8 + Tailwind CSS v4 |
-| 🧪 **單元測試** | Vitest（70 tests passed：退場判定、拖曳落位、記帳統計、備忘篩選、流水帳觸發比對、模板匯出/匯入、**同步空覆蓋防護/409衝突**、store 流程） |
+| 🧪 **單元測試** | Vitest（81 tests passed：退場判定、拖曳落位、記帳統計、備忘篩選、流水帳觸發比對、模板匯出/匯入、**同步空覆蓋防護/409衝突**、store 流程） |
 | 🐙 **原始碼** | [PosenChen/kanban](https://github.com/PosenChen/kanban) |
-| 📦 **資料備份倉庫** | [PosenChen/kanban-data](https://github.com/PosenChen/kanban-data)（`data/projects.json` / `milestones.json` / `todos.json` / `routines.json` / `ledger.json` / `memos.json`） |
+| 📦 **資料備份倉庫** | [PosenChen/kanban-data](https://github.com/PosenChen/kanban-data)（`data/projects.json` / `milestones.json` / `todos.json` / `routines.json` / `ledger.json` / `memos.json` / `topics.json`） |
 
 ---
 
@@ -36,6 +36,7 @@
 | **拖曳排序** | 側欄專案（限同群組）與待辦清單直接拖曳落位，藍色插入線指示、幽靈半透明；▲▼ 保留為觸控/無障礙備用 |
 | **記帳（收支）** | `/ledger` 隨手記收入／支出（日期／金額／類別／備註），月度收入・支出・淨額卡＋支出分類占比条，快速類別選取，CRUD + 確認刪除 + GitHub 同步（`ledger.json`） |
 | **備忘錄** | `/memo` 隨記便條（標題／內文／標籤），關鍵字搜尋＋標籤篩選＋📌 置頂，原生 `<details>` 折頁，CRUD + GitHub 同步（`memos.json`） |
+| **選題庫（每日一文）** | `/topics` 主題池 FIFO 輪流：「今日題」大卡自動舉題（未交卷明日黏住同題），✍️ 領題 → ✅ 交卷、▲▼ 調序、本月交卷統計、CRUD + GitHub 同步（`topics.json`） |
 | **展開狀態持久化** | 甘特圖父子專案展開/收合狀態存入 `localStorage`，跨頁與重載保持 |
 | **深色模式** | Tailwind v4 class-based 暗色主題，light/dark/system 三檔切換，浮動切換鈕，pre-paint 防閃白 |
 | **數據同步** | LocalStorage 本地儲存 + GitHub API 雲端備份（手動/自動，3 秒去抖自動上傳） |
@@ -95,6 +96,8 @@ kanban/
     │   ├── ledgerUtils.test.ts     # 記帳單元測試（5 tests）
     │   ├── memoUtils.ts         # 備忘篩選純函式（關鍵字/標籤/置頂排序）
     │   ├── memoUtils.test.ts       # 備忘單元測試（5 tests）
+    │   ├── topicUtils.ts          # 選題輪流純函式（todayTopic/領題/交卷/調序/重排）
+    │   ├── topicUtils.test.ts       # 選題單元測試（7 tests）
     │   ├── exportUtils.ts      # 專案模板組裝/匯出 + Word HTML builder
     │   └── exportUtils.test.ts     # 模板單元測試（5 tests）
     ├── components/
@@ -111,6 +114,7 @@ kanban/
     │   ├── ProjectDetailPage.tsx  # 專案詳細頁（含返回父專案）
     │   ├── LedgerPage.tsx      # 記帳頁（/ledger：收支＋月度統計）
     │   ├── MemoPage.tsx        # 備忘錄頁（/memo：便條＋搜尋＋標籤＋📌 置頂）
+    │   ├── TopicsPage.tsx      # 選題庫頁（/topics：今日題大卡＋輪流池＋交卷統計）
     │   ├── ArchivePage.tsx     # 檔案庫頁（/archive：按月分組、還原／永久刪除）
     │   └── SettingsPage.tsx    # 設定與同步（含退場門檻日數）
     └── main.tsx
@@ -147,7 +151,7 @@ npm run preview
 - **GitHub API**: 在設定頁填入 Personal Access Token 後可啟用雲端同步
   - 手動下載：從 `PosenChen/kanban-data` 拉取最新資料（`kanban_storage_source = "github"` 時啟用）
   - 自動上傳：修改後 3 秒去抖自動同步至 GitHub
-  - 六個資料檔：`data/projects.json`、`data/milestones.json`、`data/todos.json`、`data/routines.json`、`data/ledger.json`、`data/memos.json`
+  - 七個資料檔：`data/projects.json`、`data/milestones.json`、`data/todos.json`、`data/routines.json`、`data/ledger.json`、`data/memos.json`、`data/topics.json`
 - **載入時自動遷移**: 舊格式 `date` 自動轉為 `start_date`/`end_date`；缺失或重複的 `sort_order` 自動重排為連續值
 - **自動退場**: 載入時執行 `autoArchive()` —— 已完成且逾期 ≥ `kanban_archive_days`（預設 14 天）的物件打上 `archived_at` 標記退場至檔案庫；專案採**群組規則**（父與全部子孫都完成、以最晚結束日計），只標記、絕不刪除
 
@@ -232,6 +236,21 @@ npm run preview
 | date | string | 記錄日 (YYYY-MM-DD，預設今日) |
 | pinned? | boolean | 📌 置頂 |
 | created_at / updated_at | string | ISO-8601 時間戳 |
+
+### Topic（選題庫／每日一文）
+| 欄位 | 類型 | 說明 |
+|------|------|------|
+| id | string | 唯一識別碼 |
+| title | string | 主題標題（必填） |
+| outline? | string | 大綱／靈感（正文外链不入库） |
+| tags | string[] | 標籤（散文/技術/隨筆…快速選取） |
+| status | TopicStatus | `pool` 儲備／`writing` 撰寫中／`done` 已交卷 |
+| sort_order | number | 池內輪流順序（0 = 隊首先寫） |
+| added_date | string | 入庫日 (YYYY-MM-DD) |
+| done_date? | string | 交卷日；undefined = 未交卷 |
+| created_at / updated_at | string | ISO-8601 時間戳 |
+
+> 輪流語意：今日題 = writing 黏住順延；無 writing 則舉 sort_order 最小之 pool；池空提示儲備。
 
 ### ProjectTemplate（專案模板）
 | 欄位 | 類型 | 說明 |
@@ -334,6 +353,11 @@ npm run preview
 - **雲端每日快照**：`kanban-data` 新增 `daily-backup.yml` —— 每日 02:00 (UTC+8) 全數 `data/*.json` → `backups/YYYYMMDD/`，保留 90 天，可手動觸發；誤覆蓋後有二層退路（快照＋git 歷史）
 - 工程：`store.syncguard.test.ts` mock fetch 驗證跳過/上傳/409（4 tests）— 全數 **70 tests passed**
 
+### 🗓️ 2026-09-05 — 選題庫（每日一文）
+- **`/topics` 選題庫**：主題池 FIFO 輪流——「今日題」大卡自動舉題（`writing` 未交卷明日黏住同一題，零記憶負擔）；✍️ 領題開寫／✅ 交卷／↩ 放回池、池內 ▲▼ 調序、本月交卷統計徽章、歷史交卷清單
+- 工程：`Topic` 型別（pool/writing/done）；`utils/topicUtils.ts` 輪流純函式（todayTopic/claimTopic/completeTopic/swapPoolOrder/reorderPoolAfterRemove，TDD 7）；store `addTopic/getTopics/todayTopic/claimTopic/completeTopic/releaseTopic/moveTopic/removeTopic`＋`kanban_topics`＋`data/topics.json` 第七檔同步（含空覆蓋防護／409 衝突／確認框比對七檔）；甘特圖工具列 📚 入口 — 全數 **81 tests passed**
+- 修正：`addTopic` id 改 `Date.now()+random` 防同毫秒碰撞（原毫秒戳碰撞會致兩題同 id、刪一併失）
+
 ### 🗓️ 2026-09-05 — 優先級調色常駐化
 - 移除「優先級調色」勾選開關與「優先級（飽和度 高→低）：」引導文字——色塊／菱形**一律**依優先級調色（飽和度 100/72/45），飽和度圖例常顯
 - 連帶清除死代碼：`isColorByPriority()`／`STORAGE_KEY_COLOR_BY_PRIORITY`（舊 localStorage 值殘留無影響）
@@ -353,6 +377,7 @@ npm run preview
 - [x] 自動退場 + 檔案庫頁（/archive：還原／永久刪除）
 - [x] 記帳（/ledger：收支＋月度統計＋GitHub 同步）
 - [x] 備忘錄（/memo：便條＋搜尋＋標籤＋📌 置頂＋GitHub 同步）
+- [x] 選題庫（/topics：每日一文 FIFO 輪流＋領題/交卷＋GitHub 同步）
 - [ ] 待辦事項的日期關聯
 - [ ] 專案子任務管理
 - [ ] 更多視覺自訂選項
