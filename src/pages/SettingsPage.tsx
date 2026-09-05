@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { projectStore, scheduleGitHubSync, getSyncStatus, getStorageSource, setStorageSource, getArchiveDays } from '@/data/localStorageStore'
+import { projectStore, scheduleGitHubSync, getSyncStatus, getStorageSource, setStorageSource, getArchiveDays, pushToGitHub, getLocalCounts, fetchRemoteCounts, type SyncEventDetail } from '@/data/localStorageStore'
+import { formatCountSummary } from '@/utils/syncGuardUtils'
 import { isProjectTemplate } from '@/utils/exportUtils'
 
 function SettingsPage() {
@@ -10,6 +11,21 @@ function SettingsPage() {
 
   useEffect(() => {
     setSyncInfo(getSyncStatus())
+    // 自動同步（3秒去抖）的結果也反映到 UI：衝突/錯誤要讓使用者看見
+    const onSync = (e: Event) => {
+      const d = (e as CustomEvent<SyncEventDetail>).detail
+      if (d.state === 'conflict') {
+        setSyncStatus('error')
+        setErrorMessage(`⚠️ 同步衝突：${d.path} 已被其他裝置更新，請先「下載」再上傳。`)
+      } else if (d.state === 'error') {
+        setSyncStatus('error')
+        setErrorMessage('背景同步失敗：' + d.message)
+      } else if (d.state === 'ok' && d.skipped.length > 0) {
+        setErrorMessage(`自動同步跳過空覆蓋：${d.skipped.join(', ')}`)
+      }
+    }
+    window.addEventListener('kanban:sync-status', onSync)
+    return () => window.removeEventListener('kanban:sync-status', onSync)
   }, [])
 
   const handleExport = () => {
@@ -116,7 +132,7 @@ function SettingsPage() {
     }
   }
 
-  const handlePushGitHub = () => {
+  const handlePushGitHub = async () => {
     const token = localStorage.getItem('kanban_github_token')
     if (!token || token.trim().length < 10) {
       alert('尚未設定 GitHub Token')
@@ -124,15 +140,35 @@ function SettingsPage() {
     }
     setSyncStatus('syncing')
     setErrorMessage('')
-    try {
-      scheduleGitHubSync(token, true)
-      setTimeout(() => {
+    // 上傳前先拉雲端筆數，確認對話框顯示「本地/雲端」比對，防誤清空
+    const local = getLocalCounts()
+    const remote = await fetchRemoteCounts(token.trim())
+    const labels = ['專案', '活動', '待辦', '流水帳', '記帳', '備忘']
+    const lc = [local.projects, local.milestones, local.todos, local.routines, local.ledger, local.memos]
+    const rc = [remote.projects, remote.milestones, remote.todos, remote.routines, remote.ledger, remote.memos]
+    const zeroOverwrite = labels.filter((_, i) => lc[i] === 0 && rc[i] > 0)
+    let msg = `上傳（覆蓋）到 GitHub？\n比對 本地/雲端：\n${formatCountSummary(labels, lc, rc)}`
+    if (zeroOverwrite.length > 0) {
+      msg += `\n\n⚠️ 本地為空但雲端有資料：${zeroOverwrite.join('、')}——這些檔將自動跳過不上傳（空覆蓋防護）。`
+    }
+    if (!confirm(msg)) { setSyncStatus('idle'); return }
+    const force = confirm('強制上傳全部檔案（含本地為空者）？\n選「取消」則維持防護：本地空的檔案跳過不覆蓋雲端。')
+    const result = await pushToGitHub(token.trim(), force)
+    if (result.state === 'ok') {
+      if (result.skipped.length > 0) {
         setSyncStatus('success')
-        setTimeout(() => setSyncStatus('idle'), 3000)
-      }, 1000)
-    } catch (error) {
+        setErrorMessage(`已上傳 ${result.uploaded.length} 檔；跳過（空覆蓋防護）：${result.skipped.join(', ')}`)
+      } else {
+        setSyncStatus('success')
+      }
+      setTimeout(() => setSyncStatus('idle'), 3000)
+    } else if (result.state === 'conflict') {
       setSyncStatus('error')
-      setErrorMessage('同步失敗：' + (error as Error).message)
+      setErrorMessage(`衝突：${result.path} 已被其他裝置更新，請先「下載」合併後再上傳。`)
+      setTimeout(() => setSyncStatus('idle'), 8000)
+    } else {
+      setSyncStatus('error')
+      setErrorMessage('同步失敗：' + result.message)
       setTimeout(() => setSyncStatus('idle'), 5000)
     }
   }

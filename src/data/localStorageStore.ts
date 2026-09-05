@@ -4,6 +4,7 @@ import { dateToStr, formatDate } from '@/utils/dateUtils'
 import { remapAndShift, type ProjectTemplate } from '@/utils/exportUtils'
 import { isItemArchivable, selectArchivableGroups, type GroupNode } from '@/utils/archiveUtils'
 import { reorderToSlot } from '@/utils/reorderUtils'
+import { shouldSkipEmptyUpload } from '@/utils/syncGuardUtils'
 
 const STORAGE_KEY_DATA = 'kanban_projects'
 const STORAGE_KEY_MILESTONES = 'kanban_milestones'
@@ -145,40 +146,53 @@ try {
 
 // ── GitHub API ──
 
-async function readGitHubFile(token: string, filePath: string): Promise<unknown[]> {
+/** 下載時記錄各檔 sha（供上傳時衝突偵測：雲端被別台裝置改過 → 409） */
+const remoteShas = new Map<string, string>()
+
+async function readGitHubFileFull(token: string, filePath: string): Promise<{ data: unknown[]; sha: string; ok: boolean }> {
   try {
     const res = await fetch(`https://api.github.com/repos/PosenChen/kanban-data/contents/${filePath}`, {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' },
       signal: AbortSignal.timeout(15000),
     })
     if (!res.ok) throw new Error(`GitHub API error for ${filePath}: ${res.status}`)
-    const data: { content: string; sha: string } = await res.json()
-    const bin = Uint8Array.from(atob(data.content), c => c.charCodeAt(0))
+    const d: { content: string; sha: string } = await res.json()
+    const bin = Uint8Array.from(atob(d.content), c => c.charCodeAt(0))
     const text = new TextDecoder('utf-8').decode(bin)
-    return JSON.parse(text)
+    const data = JSON.parse(text) as unknown[]
+    remoteShas.set(filePath, d.sha) // 記 sha：此後的上傳以此驗證中間未被人改
+    return { data, sha: d.sha, ok: true }
   } catch {
-    return []
+    return { data: [], sha: '', ok: false }
   }
 }
 
-async function writeGitHubFile(token: string, filePath: string, data: unknown[], sha: string = ''): Promise<void> {
+async function readGitHubFile(token: string, filePath: string): Promise<unknown[]> {
+  return (await readGitHubFileFull(token, filePath)).data
+}
+
+/** 409 衝突：雲端檔案已被其他裝置更新 */
+export class SyncConflictError extends Error {
+  constructor(public readonly path: string) {
+    super(`Sync conflict: ${path} was modified on GitHub by another device. Please download & merge first.`)
+    this.name = 'SyncConflictError'
+  }
+}
+
+async function writeGitHubFile(token: string, filePath: string, data: unknown[]): Promise<void> {
   const json = JSON.stringify(data, null, 2)
   const bytes = new TextEncoder().encode(json)
   const bin = String.fromCharCode(...bytes)
   const encoded = btoa(bin)
 
-  try {
-    const res = await fetch(`https://api.github.com/repos/PosenChen/kanban-data/contents/${filePath}`, {
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' },
-      signal: AbortSignal.timeout(10000),
-    })
-    if (res.ok) {
-      const d: { sha: string } = await res.json()
-      sha = d.sha
-    }
-  } catch { /* no file yet */ }
+  // 用下載時記的 sha（若从未下載過，先讀一次取得 sha 再寫，避免盲蓋）
+  let sha = remoteShas.get(filePath) ?? ''
+  if (!sha) {
+    const cur = await readGitHubFileFull(token, filePath)
+    sha = cur.sha
+  }
 
-  await fetch(`https://api.github.com/repos/PosenChen/kanban-data/contents/${filePath}`, {
+  const res = await fetch(`https://api.github.com/repos/PosenChen/kanban-data/contents/${filePath}`, {
     method: 'PUT',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -193,25 +207,51 @@ async function writeGitHubFile(token: string, filePath: string, data: unknown[],
     }),
     signal: AbortSignal.timeout(15000),
   })
+
+  if (res.status === 409 || res.status === 412) {
+    // 中間有人改過：不強推，記新 sha 後拋衝突（UI 提示先下載合併）
+    const cur = await readGitHubFileFull(token, filePath)
+    if (cur.sha) remoteShas.set(filePath, cur.sha)
+    throw new SyncConflictError(filePath)
+  }
+  if (!res.ok) {
+    throw new Error(`GitHub upload failed for ${filePath}: HTTP ${res.status}`)
+  }
+  const d: { content?: { sha?: string } } = await res.json().catch(() => ({}) as { content?: { sha?: string } })
+  if (d.content?.sha) remoteShas.set(filePath, d.content.sha)
 }
 
 export async function readGitHub(token: string): Promise<Project[]> {
   return readGitHubFile(token, GITHUB_PROJECTS_PATH) as Promise<Project[]>
 }
 
-export async function writeGitHub(token: string, projects: Project[], milestones: Milestone[], todos: Todo[], routines: Routine[], ledger: LedgerEntry[] = [], memos: Memo[] = []): Promise<void> {
-  // Write projects
-  await writeGitHubFile(token, GITHUB_PROJECTS_PATH, projects)
-  // Write milestones
-  await writeGitHubFile(token, GITHUB_MILESTONES_PATH, milestones)
-  // Write todos
-  await writeGitHubFile(token, GITHUB_TODOS_PATH, todos)
-  // Write routines
-  await writeGitHubFile(token, GITHUB_ROUTINES_PATH, routines)
-  // Write ledger
-  await writeGitHubFile(token, GITHUB_LEDGER_PATH, ledger)
-  // Write memos
-  await writeGitHubFile(token, GITHUB_MEMOS_PATH, memos)
+export async function writeGitHub(token: string, projects: Project[], milestones: Milestone[], todos: Todo[], routines: Routine[], ledger: LedgerEntry[] = [], memos: Memo[] = [], opts: { force?: boolean } = {}): Promise<{ uploaded: string[]; skipped: string[] }> {
+  const files: [string, unknown[]][] = [
+    [GITHUB_PROJECTS_PATH, projects],
+    [GITHUB_MILESTONES_PATH, milestones],
+    [GITHUB_TODOS_PATH, todos],
+    [GITHUB_ROUTINES_PATH, routines],
+    [GITHUB_LEDGER_PATH, ledger],
+    [GITHUB_MEMOS_PATH, memos],
+  ]
+  const uploaded: string[] = []
+  const skipped: string[] = []
+
+  for (const [path, local] of files) {
+    if (local.length === 0 && !opts.force) {
+      // 空覆蓋防護：本地空 → 查雲端；雲端非空/讀取失敗 → 跳過，絕不把雲端清空
+      const remote = await readGitHubFileFull(token, path)
+      const skip = shouldSkipEmptyUpload(0, remote.ok ? remote.data.length : -1)
+      if (skip) {
+        skipped.push(path)
+        console.warn(`[sync] skipped ${path}: local empty but cloud has ${remote.data.length} items (empty-overwrite guard)`)
+        continue
+      }
+    }
+    await writeGitHubFile(token, path, local)
+    uploaded.push(path)
+  }
+  return { uploaded, skipped }
 }
 
 export async function readMilestonesGitHub(token: string): Promise<Milestone[]> {
@@ -1170,17 +1210,59 @@ window.addEventListener('storage', (e) => {
 
 let syncTimer: ReturnType<typeof setTimeout> | null = null
 
+/** 同步狀態事件：ok / skipped / conflict / error（設定頁訂閱顯示） */
+export type SyncEventDetail =
+  | { state: 'ok'; uploaded: string[]; skipped: string[] }
+  | { state: 'conflict'; path: string }
+  | { state: 'error'; message: string }
+
+function emitSyncStatus(detail: SyncEventDetail) {
+  window.dispatchEvent(new CustomEvent<SyncEventDetail>('kanban:sync-status', { detail }))
+}
+
+export function getLocalCounts() {
+  return { projects: cached.length, milestones: milestones.length, todos: todos.length, routines: routines.length, ledger: ledger.length, memos: memos.length }
+}
+
+export async function pushToGitHub(token: string, force = false): Promise<SyncEventDetail> {
+  try {
+    const { uploaded, skipped } = await writeGitHub(token, cached, milestones, todos, routines, ledger, memos, { force })
+    if (skipped.length > 0) {
+      console.warn(`[sync] skipped (empty-overwrite guard): ${skipped.join(', ')}`)
+    }
+    return { state: 'ok', uploaded, skipped }
+  } catch (err: unknown) {
+    if (err instanceof SyncConflictError) return { state: 'conflict', path: err.path }
+    return { state: 'error', message: (err as Error).message }
+  }
+}
+
+/** 取得雲端六檔筆數（供上傳前確認比對；讀取失敗以 -1 表示未知） */
+export async function fetchRemoteCounts(token: string): Promise<Record<keyof ReturnType<typeof getLocalCounts>, number>> {
+  const paths: [keyof ReturnType<typeof getLocalCounts>, string][] = [
+    ['projects', GITHUB_PROJECTS_PATH], ['milestones', GITHUB_MILESTONES_PATH], ['todos', GITHUB_TODOS_PATH],
+    ['routines', GITHUB_ROUTINES_PATH], ['ledger', GITHUB_LEDGER_PATH], ['memos', GITHUB_MEMOS_PATH],
+  ]
+  const out = {} as Record<keyof ReturnType<typeof getLocalCounts>, number>
+  await Promise.all(paths.map(async ([key, path]) => {
+    const r = await readGitHubFileFull(token, path)
+    out[key] = r.ok ? r.data.length : -1
+  }))
+  return out
+}
+
 export function scheduleGitHubSync(token: string | null, force: boolean = false) {
   if (!token || token.trim() === '') return
   if (syncTimer && !force) clearTimeout(syncTimer)
 
   syncTimer = setTimeout(async () => {
-    try {
-      await writeGitHub(token.trim(), cached, milestones, todos, routines, ledger, memos)
-      console.log('✅ Synced to GitHub')
-    } catch (err: unknown) {
-      console.warn('GitHub sync failed:', err)
+    const result = await pushToGitHub(token.trim(), force)
+    if (result.state === 'ok') {
+      console.log(`✅ Synced to GitHub (${result.uploaded.length} files${result.skipped.length ? `, skipped ${result.skipped.length}` : ''})`)
+    } else {
+      console.warn('GitHub sync issue:', result)
     }
+    emitSyncStatus(result)
   }, force ? 0 : 3000)
 }
 

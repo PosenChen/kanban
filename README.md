@@ -8,7 +8,7 @@
 | 📅 **專案啟動** | 2026-08-22 |
 | 🔄 **最新版本** | 2026-09-03 |
 | 📦 **技術架構** | React 19 + TypeScript 7 + Vite 8 + Tailwind CSS v4 |
-| 🧪 **單元測試** | Vitest（59 tests passed：退場判定、拖曳落位、記帳統計、備忘篩選、流水帳觸發比對、模板匯出/匯入、store 流程） |
+| 🧪 **單元測試** | Vitest（70 tests passed：退場判定、拖曳落位、記帳統計、備忘篩選、流水帳觸發比對、模板匯出/匯入、**同步空覆蓋防護/409衝突**、store 流程） |
 | 🐙 **原始碼** | [PosenChen/kanban](https://github.com/PosenChen/kanban) |
 | 📦 **資料備份倉庫** | [PosenChen/kanban-data](https://github.com/PosenChen/kanban-data)（`data/projects.json` / `milestones.json` / `todos.json` / `routines.json` / `ledger.json` / `memos.json`） |
 
@@ -39,6 +39,7 @@
 | **展開狀態持久化** | 甘特圖父子專案展開/收合狀態存入 `localStorage`，跨頁與重載保持 |
 | **深色模式** | Tailwind v4 class-based 暗色主題，light/dark/system 三檔切換，浮動切換鈕，pre-paint 防閃白 |
 | **數據同步** | LocalStorage 本地儲存 + GitHub API 雲端備份（手動/自動，3 秒去抖自動上傳） |
+| **同步防護（防誤覆蓋）** | 本地空＋雲端非空 → **自動跳過上傳**（絕不把雲端清空）；sha 衝突偵測（其他裝置先改 → 409 中止並提示先下載合併）；手動上傳前確認框顯示**本地/雲端六檔筆數比對**；上傳失敗如實報錯；`kanban-data` 倉庫 Actions **每日快照** `backups/YYYYMMDD/` 保留 90 天 |
 | **資料備份/還原** | JSON 匯出/匯入，完整備份專案、活動與待辦 |
 
 ---
@@ -324,6 +325,14 @@ npm run preview
 ### 🗓️ 2026-09-03 — 備忘錄
 - **`/memo` 備忘錄頁**：隨記便條（標題／內文／日期／標籤），📌 置頂、關鍵字搜尋（title/content/tags）、標籤 pill 篩選、原生 `<details>` 內文折疊、點擊編輯、✕ 確認刪除
 - 工程：`Memo` 型別；`utils/memoUtils.ts` 純函式 `filterMemos`（TDD 5）；store `addMemo/getMemos/updateMemo/removeMemo`＋`kanban_memos`＋`data/memos.json` GitHub 同步（載入併 merge、3 秒去抖上傳）；甘特圖工具列 📝 入口 — 全數 **59 tests passed**
+
+### 🗓️ 2026-09-05 — 同步防護（防誤覆蓋）
+- **空覆蓋防護**：`writeGitHub()` 上傳前逐檔檢查——本地空陣列＋雲端非空（或讀取失敗）→ **自動跳過**，新電腦誤按上傳不會清空雲端（`syncGuardUtils.ts` 純函式，TDD 7）；手動上傳可選「強制上傳」才放行
+- **sha 衝突偵測**：下載時記錄各檔 sha，上傳以舊 sha 驗證中間未被人改；其他裝置先改 → HTTP 409 拋 `SyncConflictError`，UI 明示「請先下載合併」；後端拒絕靜默失敗（PUT 後檢查 res.ok，失敗如實報錯）
+- **確認框比對**：手動上傳前顯示**本地/雲端六檔筆數**（`3/10` 格式），本地空檔自動標⚠️預跳過
+- **狀態回傳**：`kanban:sync-status` CustomEvent 讓背景自動同步的衝突/錯誤/跳過也能在設定頁浮現
+- **雲端每日快照**：`kanban-data` 新增 `daily-backup.yml` —— 每日 02:00 (UTC+8) 全數 `data/*.json` → `backups/YYYYMMDD/`，保留 90 天，可手動觸發；誤覆蓋後有二層退路（快照＋git 歷史）
+- 工程：`store.syncguard.test.ts` mock fetch 驗證跳過/上傳/409（4 tests）— 全數 **70 tests passed**
 
 ---
 
