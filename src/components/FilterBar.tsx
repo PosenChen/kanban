@@ -26,61 +26,62 @@ function FilterBar({
 }: FilterBarProps) {
   return (
     <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 space-y-3">
-      {/* Top row: search + actions */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1">
+      {/* 手機：搜尋框＋狀態＋優先級同一列（搜尋框窄化）；桌面同列Spacer拉開＋新增 */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 min-w-0 md:max-w-xs">
           <input
             type="text"
-            placeholder="搜尋專案、標籤..."
+            placeholder="搜尋..."
             value={searchQuery}
             onChange={e => onSearchChange(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+            className="w-full pl-8 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
           />
-          <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="absolute left-2.5 top-2 w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
         </div>
-        <button
-          onClick={onCreateClick}
-          className="flex items-center gap-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          新增專案
-        </button>
-      </div>
-
-      {/* Filter row */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <label className="text-xs text-gray-500 dark:text-gray-400 font-medium">狀態:</label>
+        <div className="hidden md:block flex-1" />
         <select
           value={statusFilter}
           onChange={e => onStatusChange(e.target.value)}
-          className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          aria-label="狀態篩選"
+          className="text-xs md:text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-1.5 md:px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400 shrink-0"
         >
-          <option value="">全部</option>
+          <option value="">全部狀態</option>
           <option value="preparation">準備中</option>
           <option value="in_progress">進行中</option>
           <option value="completed">已完成</option>
         </select>
 
-        <label className="text-xs text-gray-500 dark:text-gray-400 font-medium">優先級:</label>
         <select
           value={priorityFilter}
           onChange={e => onPriorityChange(e.target.value)}
-          className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          aria-label="優先級篩選"
+          className="text-xs md:text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-1.5 md:px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400 shrink-0"
         >
-          <option value="">全部</option>
+          <option value="">全部優先</option>
           <option value="high">高</option>
           <option value="medium">中</option>
           <option value="low">低</option>
         </select>
 
-        {allTags.length > 0 && (
-          <>
-            <label className="text-xs text-gray-500 dark:text-gray-400 font-medium">標籤:</label>
-            <div className="flex gap-1 flex-wrap">
+        <button
+          onClick={onCreateClick}
+          aria-label="新增專案"
+          className="flex items-center gap-1 px-2.5 md:px-4 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium shrink-0"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          <span className="hidden md:inline">新增專案</span>
+        </button>
+      </div>
+
+      {/* Tag row（標籤多，獨立一列；手機單列橫向不擠） */}
+      {allTags.length > 0 && (
+      <div className="flex items-center gap-2 flex-wrap">
+        <label className="text-xs text-gray-500 dark:text-gray-400 font-medium">標籤:</label>
+        <div className="flex gap-1 flex-wrap">
               {allTags.map(tag => (
                 <button
                   key={tag}
@@ -94,10 +95,9 @@ function FilterBar({
                   {tag}
                 </button>
               ))}
-            </div>
-          </>
-        )}
+        </div>
       </div>
+      )}
 
       <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
         <span>共 {rootCount} 個專案</span>

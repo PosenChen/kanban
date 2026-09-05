@@ -819,24 +819,25 @@ function GanttPage() {
     <div className="space-y-3">
       {/* Toolbar */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-3">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-[200px]">
+        {/* 手機：搜尋（窄）＋狀態＋優先級同一列；動作按鈕自動換行 */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[110px] md:min-w-[200px] md:max-w-sm">
             <input
               type="text"
-              placeholder="搜尋專案、標籤..."
+              placeholder="搜尋..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+              className="w-full pl-8 pr-2 py-1.5 md:pl-9 md:pr-4 md:py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
             />
-            <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="absolute left-2.5 md:left-3 top-2 md:top-2.5 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 md:gap-2">
             <select
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
-              className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="text-xs md:text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-1.5 md:px-2 py-1.5 md:py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 shrink-0"
             >
               <option value="">狀態</option>
               <option value="preparation">準備中</option>
@@ -847,18 +848,20 @@ function GanttPage() {
             <select
               value={priorityFilter}
               onChange={e => setPriorityFilter(e.target.value)}
-              className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="text-xs md:text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-1.5 md:px-2 py-1.5 md:py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 shrink-0"
             >
               <option value="">優先級</option>
               <option value="high">高</option>
               <option value="medium">中</option>
               <option value="low">低</option>
             </select>
+          </div>
+          <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
             <button
               onClick={handleAdd}
               title="新增專案"
               aria-label="新增專案"
-              className="flex items-center gap-1 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
+              className="flex items-center gap-1 px-2 md:px-3 py-1.5 md:py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
@@ -869,7 +872,7 @@ function GanttPage() {
               onClick={openAddActivity}
               title="新增活動"
               aria-label="新增活動"
-              className="flex items-center gap-1 px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 text-sm font-medium border border-purple-600 transition-colors"
+              className="flex items-center gap-1 px-2 md:px-3 py-1.5 md:py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 text-sm font-medium border border-purple-600 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 21V4m0 0h11.5a1 1 0 01.8 1.6L14 9l3.3 3.4a1 1 0 01-.8 1.6H5" />
@@ -878,7 +881,7 @@ function GanttPage() {
             </button>
             <button
               onClick={openAddTodo}
-              className="flex items-center gap-1 px-3 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 text-sm font-medium border border-teal-600 transition-colors"
+              className="flex items-center gap-1 px-2 md:px-3 py-1.5 md:py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 text-sm font-medium border border-teal-600 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
@@ -895,7 +898,7 @@ function GanttPage() {
                 <button
                   onClick={openRoutineModal}
                   title={total === 0 ? '流水帳' : allDone ? '今日流水帳已全部完成' : `今日流水帳還有 ${pending} 項未完成`}
-                  className="relative flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-amber-500 text-white hover:bg-amber-600 border border-amber-600"
+                  className="relative flex items-center gap-1 px-2 md:px-3 py-1.5 md:py-2 rounded-lg text-sm font-medium transition-colors bg-amber-500 text-white hover:bg-amber-600 border border-amber-600"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -912,7 +915,7 @@ function GanttPage() {
             })()}
             <button
               onClick={handleNavigateToSettings}
-              className="flex items-center gap-1 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm font-medium border border-green-600 transition-colors"
+              className="flex items-center gap-1 px-2 md:px-3 py-1.5 md:py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm font-medium border border-green-600 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -922,7 +925,7 @@ function GanttPage() {
             <button
               onClick={handleLoadFromGitHub}
               disabled={isLoading}
-              className="flex items-center gap-1 px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium border border-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-1 px-2 md:px-3 py-1.5 md:py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium border border-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
