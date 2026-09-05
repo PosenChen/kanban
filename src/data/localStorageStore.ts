@@ -11,7 +11,6 @@ const STORAGE_KEY_MILESTONES = 'kanban_milestones'
 const STORAGE_KEY_TODOS = 'kanban_todos'
 const STORAGE_KEY_TOKEN = 'kanban_github_token'
 const STORAGE_KEY_SOURCE = 'kanban_storage_source'
-export const STORAGE_KEY_COLOR_BY_PRIORITY = 'kanban_color_by_priority'
 const STORAGE_KEY_ROUTINES = 'kanban_routines'
 const STORAGE_KEY_LEDGER = 'kanban_ledger'
 const STORAGE_KEY_MEMOS = 'kanban_memos'
@@ -21,11 +20,6 @@ const STORAGE_KEY_ARCHIVE_DAYS = 'kanban_archive_days'
 export function getArchiveDays(): number {
   const n = parseInt(localStorage.getItem(STORAGE_KEY_ARCHIVE_DAYS) ?? '14', 10)
   return Number.isFinite(n) && n >= 0 ? n : 14
-}
-
-/** Default ON unless the user explicitly turned it off ('false'). */
-export function isColorByPriority(): boolean {
-  return localStorage.getItem(STORAGE_KEY_COLOR_BY_PRIORITY) !== 'false'
 }
 
 const GITHUB_PROJECTS_PATH = 'data/projects.json'

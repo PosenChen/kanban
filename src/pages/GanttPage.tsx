@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
-import { projectStore, setStorageSource, isColorByPriority, STORAGE_KEY_COLOR_BY_PRIORITY } from '@/data/localStorageStore'
+import { projectStore, setStorageSource } from '@/data/localStorageStore'
 import { STATUS_CONFIG, QUICK_TAGS, WEEKDAY_LABELS, type Project, type Milestone, type Todo, type ProjectPriority, type Routine } from '@/types/project'
 import { dateToStr } from '@/utils/dateUtils'
 import { getActiveRoutines, isDoneToday, todayStr } from '@/utils/routineUtils'
@@ -109,7 +109,6 @@ interface DayHeader {
 function GanttPage() {
   const [theme] = useTheme()
   const dk = theme === 'dark'
-  const [colorByPriority, setColorByPriority] = useState(isColorByPriority)
   const navigate = useNavigate()
   const { projects, add, update, remove, moveProjectUp, moveProjectDown } = useProjects()
   const [milestones, setMilestones] = useState<Milestone[]>(() => projectStore.getMilestones())
@@ -784,7 +783,7 @@ function GanttPage() {
           width={barWidth}
           height={barH}
           rx={3} ry={3}
-          fill={colorByPriority ? desaturate(baseColor, PRIORITY_SATURATIONS[project.priority] ?? 100, dk) : baseColor}
+          fill={desaturate(baseColor, PRIORITY_SATURATIONS[project.priority] ?? 100, dk)}
           onClick={() => handleProjectClick(project.id)}
           onPointerDown={e => startDrag(e, { kind: 'move', target: 'project', id: project.id, x, w: barWidth, y: barY, h: barH })}
           style={{ pointerEvents: 'auto', cursor: drag?.id === project.id ? 'grabbing' : 'grab', touchAction: 'none' }}
@@ -965,34 +964,11 @@ function GanttPage() {
             <Link to="/archive" className="flex items-center gap-1 px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors" title="已退場項目的歷史檔案">
               🗂️ 檔案庫
             </Link>
-            <label className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 cursor-pointer select-none" title="開啟後依優先級降低色塊飽和度（高=不變、中=偏灰、低=更淡灰）；關閉 = 色塊飽和度只由狀態決定（維持舊行為）">
-              <input
-                type="checkbox"
-                checked={colorByPriority}
-                onChange={e => {
-                  setColorByPriority(e.target.checked)
-                  localStorage.setItem(STORAGE_KEY_COLOR_BY_PRIORITY, String(e.target.checked))
-                  window.dispatchEvent(new CustomEvent('kanban:filter-change'))
-                }}
-                className="w-3.5 h-3.5 accent-blue-500"
-              />
-              優先級調色
-            </label>
-            {!colorByPriority && (
-              <>
-                <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-yellow-400"></span>準備中</span>
-                <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-blue-500"></span>進行中</span>
-                <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-orange-400"></span>等待中</span>
-                <span className="flex items-center gap-1 text-xs"><span className="w-3 h-3 rounded inline-block bg-green-500"></span>已完成</span>
-              </>
-            )}
           </div>
         </div>
 
-        {/* Priority legend (mutually exclusive with status legend above): same saturations as rendered bars */}
-        {colorByPriority && (
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-xs text-gray-500 dark:text-gray-400">優先級（飽和度 高→低）：</span>
+        {/* Priority saturation legend: same saturations as rendered bars */}
+        <div className="flex items-center gap-3 flex-wrap">
             {([['#3B82F6', '進行中'], ['#F97316', '等待中'], ['#10B981', '已完成']] as const).map(([hex, label]) => (
               <span key={hex} className="flex items-center gap-1 text-xs">
                 <span className="flex gap-px">
@@ -1001,10 +977,9 @@ function GanttPage() {
                   ))}
                 </span>
                 {label}
-              </span>
-            ))}
-          </div>
-        )}
+            </span>
+          ))}
+        </div>
       </div>
 
       {/* Gantt Chart — frozen sidebar + scrollable right */}
@@ -1293,7 +1268,7 @@ function GanttPage() {
                           x={cx - 4} y={cy - 4}
                           width={8} height={8} rx={1.5}
                           transform={`rotate(45 ${cx} ${cy})`}
-                          fill={colorByPriority ? desaturate(statusColorMap[mc.status] || '#3B82F6', PRIORITY_SATURATIONS[mc.priority] ?? 100, dk) : (statusColorMap[mc.status] || '#3B82F6')}
+                          fill={desaturate(statusColorMap[mc.status] || '#3B82F6', PRIORITY_SATURATIONS[mc.priority] ?? 100, dk)}
                           stroke={dk ? '#111827' : '#ffffff'}
                           strokeWidth={1}
                           opacity={0.95}
