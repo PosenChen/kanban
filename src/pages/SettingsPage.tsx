@@ -196,7 +196,8 @@ function SettingsPage() {
 
       <div className="bg-blue-50 dark:bg-blue-950 rounded-lg p-4 text-sm text-blue-700 dark:text-blue-300">
         <p><strong>數據持久化設置</strong></p>
-        <p>手動同步機制：下載（讀取）從 GitHub 拉取資料，上傳（同步）推送資料到 GitHub</p>
+        <p>雲端模式（有 Token）：修改 3 秒後自動上傳；開站／切回視窗自動下載合併（同 ID 取最新）——多裝置勾選狀態即時互通。</p>
+        <p>手動：「下載」拉取雲端、「上傳」推送本地（比對筆數＋空覆蓋防護）。</p>
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-4">
@@ -205,12 +206,14 @@ function SettingsPage() {
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">📡 同步狀態</h3>
           {syncInfo.hasToken ? (
             <div className="space-y-2 text-sm">
-              <p className="text-green-600 font-medium">✅ 已检测到 GitHub Token</p>
-              <p className="text-gray-500 dark:text-gray-400">目前使用方式：LocalStorage（本地儲存）</p>
+              <p className="text-green-600 font-medium">✅ 已偵測到 GitHub Token</p>
+              <p className="text-gray-500 dark:text-gray-400">
+                目前使用方式：{getStorageSource() === 'github' ? '☁️ 雲端模式（自動上傳＋開站自動下載合併）' : '💾 LocalStorage（已備 Token，尚未切換雲端模式——下方一鍵切換）'}
+              </p>
             </div>
           ) : (
             <div className="space-y-2 text-sm">
-              <p className="text-orange-600 font-medium">⚠️ 未检测到 GitHub Token</p>
+              <p className="text-orange-600 font-medium">⚠️ 未偵測到 GitHub Token</p>
               <p className="text-gray-500 dark:text-gray-400">目前只使用 LocalStorage（每個瀏覽器獨立保存）</p>
             </div>
           )}

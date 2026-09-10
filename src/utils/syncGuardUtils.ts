@@ -38,6 +38,45 @@ export function buildSyncPlan(files: FilePlan[]): SyncPlan {
   return plan
 }
 
+/**
+ * 跨裝置狀態合併純函式：同 ID 以 `updated_at` 新者勝出（last-write-wins）。
+ * 修補「下載只補新 ID、舊項永不更新」——待辦 completed、流水帳 completed_date、
+ * 專案 status/progress 等狀態欄位必須隨載入刷新，否则多裝置勾選狀態各說各話。
+ * - 僅雲端有 → 加入
+ * - 兩邊都有 → remote.updated_at 較新則以 remote 覆蓋本地
+ * - 缺 updated_at 者視為最舊（不覆蓋有時間戳的對方）
+ * @param tieBreakLocalWins 時間戳相同時保留本地（預設），避免同刻抖動反覆盪換
+ */
+export function mergeById<T extends { id: string; updated_at?: string }>(
+  local: T[],
+  remote: T[],
+  tieBreakLocalWins = true,
+): { merged: T[]; added: number; refreshed: number } {
+  const byId = new Map(local.map(x => [x.id, x]))
+  let added = 0
+  let refreshed = 0
+  const merged = [...local]
+  for (const r of remote) {
+    const cur = byId.get(r.id)
+    if (!cur) {
+      merged.push(r)
+      byId.set(r.id, r)
+      added++
+      continue
+    }
+    const la = cur.updated_at ?? ''
+    const ra = r.updated_at ?? ''
+    const remoteWins = ra > la || (!ra && !la && !tieBreakLocalWins)
+    if (remoteWins) {
+      const idx = merged.findIndex(x => x.id === r.id)
+      if (idx !== -1) merged[idx] = r
+      byId.set(r.id, r)
+      refreshed++
+    }
+  }
+  return { merged, added, refreshed }
+}
+
 /** 比對摘要字串：本地 vs 雲端（供確認對話框） */
 export function formatCountSummary(
   labels: string[],
