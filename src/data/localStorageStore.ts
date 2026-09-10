@@ -315,6 +315,10 @@ let topics: Topic[] = loadTopics()
 // ── 同步旗標（須先於一切函式呼叫點宣告：模組求值期 migration/autoArchive→emit→scheduleGitHubSync 會讀取）──
 let syncTimer: ReturnType<typeof setTimeout> | null = null
 let autoPulling = false
+// 模組求值期（seed/migration/autoArchive→emit）不自動推：新裝置開站即推樣本上雲的漏洞封死
+let initializing = true
+// 僅瀏覽器環境自動推（Vitest node 環境不觸網）
+const _isBrowser = typeof navigator !== 'undefined' && /Mozilla|AppleWebKit|Chrome|Safari/i.test(navigator.userAgent ?? '')
 let lastAutoPullAt = 0
 const AUTO_PULL_MIN_INTERVAL_MS = 30_000
 let crossTabReload = false
@@ -1288,6 +1292,7 @@ export const projectStore = {
 
 // 模組載入（migration 之後）與跨分頁 sync 時執行自動退場
 projectStore.autoArchive()
+initializing = false // 落地完成：此後的本地修改才允許自動推
 
 // Cross-tab sync：同瀏覽器多分頁共用 LocalStorage，收到他頁寫入只需刷新 UI，
 // 不自動推回雲端（發起分頁自會推；重複推只是浪費 API 配額，更可能自撞 409）。
@@ -1381,6 +1386,8 @@ export async function fetchRemoteCounts(token: string): Promise<Record<keyof Ret
 
 export function scheduleGitHubSync(token: string | null, force: boolean = false) {
   if (!token || token.trim() === '') return
+  if (!_isBrowser && !force) return // node/測試環境不觸網
+  if (initializing && !force) return // 開站落地期（seed/migration/autoArchive）不推：防樣本污染雲端
   if (autoPulling && !force) return // 拉取中不推：拉取結束的差異偵測（lastPullHadLocalChanges）會接手補推
   if (crossTabReload && !force) return // 同瀏覽器他頁的 LocalStorage 變更：只刷 UI，不重複推
   if (!force && getStorageSource() !== 'github') return // 純本地模式不自動上傳（手動上傳按鈕不受限）
@@ -1437,8 +1444,7 @@ export async function autoPullIfCloud(force = false): Promise<void> {
 }
 
 // 開站即拉一次；手機切 App / 分頁切回 → visibility/focus 再拉（節流 30s）
-// 僅瀏覽器環境掛載（Vitest node 環境不觸發真網路請求）
-const _isBrowser = typeof navigator !== 'undefined' && /Mozilla|AppleWebKit|Chrome|Safari/i.test(navigator.userAgent ?? '')
+// 僅瀏覽器環境掛載（測試環境不觸發真網路請求）
 if (_isBrowser) {
   void autoPullIfCloud()
   window.addEventListener('focus', () => { void autoPullIfCloud() })
