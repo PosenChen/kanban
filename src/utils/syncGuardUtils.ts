@@ -77,6 +77,20 @@ export function mergeById<T extends { id: string; updated_at?: string }>(
   return { merged, added, refreshed }
 }
 
+/**
+ * 拉取合併後差異偵測：本地是否有「比雲端同 ID 更新」的項目（本地有未推的修改）。
+ * 用於決定 pull 結束後要不要補推——避免無謂 PUT 空轉。
+ */
+export function hasLocalNewer<T extends { id: string; updated_at?: string }>(local: T[], remote: T[]): boolean {
+  const byId = new Map(remote.map(x => [x.id, x.updated_at ?? '']))
+  for (const l of local) {
+    const ra = byId.get(l.id)
+    if (ra === undefined) return true // 本地独有（雲端尚未收到）
+    if ((l.updated_at ?? '') > ra) return true
+  }
+  return false
+}
+
 /** 比對摘要字串：本地 vs 雲端（供確認對話框） */
 export function formatCountSummary(
   labels: string[],

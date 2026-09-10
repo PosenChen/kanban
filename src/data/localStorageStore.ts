@@ -4,7 +4,7 @@ import { dateToStr, formatDate } from '@/utils/dateUtils'
 import { remapAndShift, type ProjectTemplate } from '@/utils/exportUtils'
 import { isItemArchivable, selectArchivableGroups, type GroupNode } from '@/utils/archiveUtils'
 import { reorderToSlot } from '@/utils/reorderUtils'
-import { shouldSkipEmptyUpload, mergeById } from '@/utils/syncGuardUtils'
+import { shouldSkipEmptyUpload, mergeById, hasLocalNewer } from '@/utils/syncGuardUtils'
 import { todayTopic, claimTopic, releaseTopic, completeTopic, swapPoolOrder, reorderPoolAfterRemove } from '@/utils/topicUtils'
 
 const STORAGE_KEY_DATA = 'kanban_projects'
@@ -311,6 +311,15 @@ let routines: Routine[] = loadRoutines()
 let ledger: LedgerEntry[] = loadLedger()
 let memos: Memo[] = loadMemos()
 let topics: Topic[] = loadTopics()
+
+// ── 同步旗標（須先於一切函式呼叫點宣告：模組求值期 migration/autoArchive→emit→scheduleGitHubSync 會讀取）──
+let syncTimer: ReturnType<typeof setTimeout> | null = null
+let autoPulling = false
+let lastAutoPullAt = 0
+const AUTO_PULL_MIN_INTERVAL_MS = 30_000
+let crossTabReload = false
+// 最近一次拉取合併後，本地是否仍有雲端沒有的變更（有才回推，不做無謂 PUT 空轉）
+let lastPullHadLocalChanges = false
 
 // Load milestones
 milestones = loadMilestones()
@@ -1070,30 +1079,45 @@ export const projectStore = {
       saveMilestones(milestones)
       emitMilestoneChange()
 
-      // Merge todos from GitHub（completed 狀態跨裝置刷新）
-      todos = mergeById(todos, await readTodosGitHub(token)).merged
+      // Load todos from GitHub
+      const loadedTodos = await readTodosGitHub(token)
+      todos = mergeById(todos, loadedTodos).merged
       saveTodos(todos)
       emitTodoChange()
 
       // Merge routines from GitHub（completed_date 跨裝置刷新）
-      routines = mergeById(routines, await readRoutinesGitHub(token)).merged
+      const loadedRoutines = await readRoutinesGitHub(token)
+      routines = mergeById(routines, loadedRoutines).merged
       saveRoutines(routines)
       emitRoutineChange()
 
       // Merge ledger from GitHub
-      ledger = mergeById(ledger, await readLedgerGitHub(token)).merged
+      const loadedLedger = await readLedgerGitHub(token)
+      ledger = mergeById(ledger, loadedLedger).merged
       saveLedger(ledger)
       emitLedgerChange()
 
       // Merge memos from GitHub
-      memos = mergeById(memos, await readMemosGitHub(token)).merged
+      const loadedMemos = await readMemosGitHub(token)
+      memos = mergeById(memos, loadedMemos).merged
       saveMemos(memos)
       emitMemoChange()
 
       // Merge topics from GitHub
-      topics = mergeById(topics, await readTopicsGitHub(token)).merged
+      const loadedTopics = await readTopicsGitHub(token)
+      topics = mergeById(topics, loadedTopics).merged
       saveTopics(topics)
       emitTopicChange()
+
+      // 合併後差異偵測：本地仍有雲端沒有的修改 → 記帳，由 autoPullIfCloud 補推
+      lastPullHadLocalChanges =
+        hasLocalNewer(cached, newProjects) ||
+        hasLocalNewer(milestones, loadedMilestones) ||
+        hasLocalNewer(todos, loadedTodos) ||
+        hasLocalNewer(routines, loadedRoutines) ||
+        hasLocalNewer(ledger, loadedLedger) ||
+        hasLocalNewer(memos, loadedMemos) ||
+        hasLocalNewer(topics, loadedTopics)
 
       emitProjectChange()
       setStorageSource('github')
@@ -1267,7 +1291,6 @@ projectStore.autoArchive()
 
 // Cross-tab sync：同瀏覽器多分頁共用 LocalStorage，收到他頁寫入只需刷新 UI，
 // 不自動推回雲端（發起分頁自會推；重複推只是浪費 API 配額，更可能自撞 409）。
-let crossTabReload = false
 window.addEventListener('storage', (e) => {
   crossTabReload = true
   try {
@@ -1303,15 +1326,11 @@ window.addEventListener('storage', (e) => {
   }
 })
 
-// ── GitHub sync (debounced 3s) ──
 
-let syncTimer: ReturnType<typeof setTimeout> | null = null
-// 自動拉取旗標：須先於 scheduleGitHubSync 的任何呼叫點（模組求值期 autoArchive→emit）宣告
-let autoPulling = false
-let lastAutoPullAt = 0
-const AUTO_PULL_MIN_INTERVAL_MS = 30_000
-// 拉取期間發生的本地修改：記帳待推，拉完立即補排程（不漏勾選）
-let pendingWhilePulling = false
+/** 可觀測性：最近拉取後的本地差異筆數（測試/除錯用） */
+export function getLastPullHadLocalChanges(): boolean {
+  return lastPullHadLocalChanges
+}
 
 /** 取得已儲存的 Token（無/過短 → null）：自動同步的開關就是「有 Token」 */
 export function getTokenOrNull(): string | null {
@@ -1362,7 +1381,7 @@ export async function fetchRemoteCounts(token: string): Promise<Record<keyof Ret
 
 export function scheduleGitHubSync(token: string | null, force: boolean = false) {
   if (!token || token.trim() === '') return
-  if (autoPulling && !force) { pendingWhilePulling = true; return } // 拉取中的修改不丟：記帳，拉完補推
+  if (autoPulling && !force) return // 拉取中不推：拉取結束的差異偵測（lastPullHadLocalChanges）會接手補推
   if (crossTabReload && !force) return // 同瀏覽器他頁的 LocalStorage 變更：只刷 UI，不重複推
   if (!force && getStorageSource() !== 'github') return // 純本地模式不自動上傳（手動上傳按鈕不受限）
   if (syncTimer && !force) clearTimeout(syncTimer)
@@ -1409,21 +1428,25 @@ export async function autoPullIfCloud(force = false): Promise<void> {
     console.warn('[sync] auto-pull failed:', (err as Error).message)
   } finally {
     autoPulling = false
-    // 拉取期間有本地修改（勾選未推）→ 補排一輪去抖上傳
-    if (pendingWhilePulling) {
-      pendingWhilePulling = false
+    // 拉取合併後本地仍有未推差異 → 補排一輪去抖上傳（不漏勾選）
+    if (lastPullHadLocalChanges) {
+      lastPullHadLocalChanges = false
       scheduleGitHubSync(token)
     }
   }
 }
 
 // 開站即拉一次；手機切 App / 分頁切回 → visibility/focus 再拉（節流 30s）
-void autoPullIfCloud()
-window.addEventListener('focus', () => { void autoPullIfCloud() })
-if (typeof document !== 'undefined') {
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') void autoPullIfCloud()
-  })
+// 僅瀏覽器環境掛載（Vitest node 環境不觸發真網路請求）
+const _isBrowser = typeof navigator !== 'undefined' && /Mozilla|AppleWebKit|Chrome|Safari/i.test(navigator.userAgent ?? '')
+if (_isBrowser) {
+  void autoPullIfCloud()
+  window.addEventListener('focus', () => { void autoPullIfCloud() })
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') void autoPullIfCloud()
+    })
+  }
 }
 
 export function getSyncStatus(): { hasToken: boolean } {

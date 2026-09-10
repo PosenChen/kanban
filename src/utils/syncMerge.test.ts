@@ -1,5 +1,27 @@
 import { describe, it, expect } from 'vitest'
-import { mergeById } from './syncGuardUtils'
+import { mergeById, hasLocalNewer } from './syncGuardUtils'
+
+describe('hasLocalNewer 拉取後差異偵測', () => {
+  it('本地独有 → true（雲端尚未收到）', () => {
+    expect(hasLocalNewer([{ id: 'a', updated_at: '2026-09-10T01:00:00Z' }], [])).toBe(true)
+  })
+  it('本地較新 → true', () => {
+    expect(hasLocalNewer(
+      [{ id: 'a', updated_at: '2026-09-10T08:00:00Z' }],
+      [{ id: 'a', updated_at: '2026-09-10T02:00:00Z' }],
+    )).toBe(true)
+  })
+  it('完全同步／雲端較新 → false（免補推）', () => {
+    expect(hasLocalNewer(
+      [{ id: 'a', updated_at: '2026-09-10T02:00:00Z' }],
+      [{ id: 'a', updated_at: '2026-09-10T02:00:00Z' }],
+    )).toBe(false)
+    expect(hasLocalNewer(
+      [{ id: 'a', updated_at: '2026-09-10T01:00:00Z' }],
+      [{ id: 'a', updated_at: '2026-09-10T05:00:00Z' }],
+    )).toBe(false)
+  })
+})
 
 const iso = (s: string) => `2026-09-10T${s}:00Z`
 
