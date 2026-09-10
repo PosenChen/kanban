@@ -403,9 +403,9 @@ npm run preview
 ### 🗓️ 20260910 — 跨裝置狀態同步修正（重大）
 - **根因**：`loadFromGitHub()` 對「已存在同 ID」一律跳過 → 其他裝置的待辦勾選、流水帳打勾、專案進度**永遠進不來**
 - **修正**：新增 `mergeById()` 純函式（同 ID 以 `updated_at` 新者勝出，tie 留本地），七類資料（專案/活動/待辦/流水帳/記帳/備忘/選題）下載一律合併刷新；本地較新不受雲端舊值倒退
-- **自動上傳接上電**：`scheduleGitHubSync()` 原為死代碼無人呼叫——現由七個 emit 掛上（雲端模式＋3 秒去抖；純本地模式與跨分頁落地不自動推，防_dup 配額與自撞 409）
+- **自動上傳接上電**：`scheduleGitHubSync()` 原為死代碼無人呼叫——現由七個 emit 掛上（雲端模式＋3 秒去抖；純本地模式與跨分頁落地不自動推，防重複耗損配額與自撞 409）
 - **自動下載**：開站／視窗 focus／visibilitychange 自動拉取合併（節流 30s；409 衝突立即 force 拉取）；拉取期間的本地修改記帳補推，不漏勾選
-- 設定頁同步狀態顯示目前模式（雲端/本地）；新回歸測試：`syncMerge.test.ts` 6 + `store.crossdevice.test.ts` 3（雙裝置情境 mock）— 全數 **90 tests passed**
+- 設定頁同步狀態顯示目前模式（雲端/本地）；新回歸測試：`syncMerge.test.ts` 9 + `store.crossdevice.test.ts` 3（雙裝置情境 mock）— 全數 **93 tests passed**
 
 ---
 
