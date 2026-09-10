@@ -53,7 +53,7 @@
 - **樣式**: Tailwind CSS v4.3 (`@tailwindcss/vite`) + 自繪 SVG 甘特圖（不依賴 frappe-gantt 渲染元件）
 - **狀態管理**: React hooks (`useProjects`) + `kanban:data-change` CustomEvent 驅動重繪
 - **數據持久化**: LocalStorage + GitHub Content API (PosenChen/kanban-data)
-- **單元測試**: Vitest（10 test files / 59 tests：退場判定、拖曳落位重排、流水帳觸發、記帳統計、備忘篩選、模板匯出/匯入、store 整合流程）
+- **單元測試**: Vitest（14 test files / 81 tests：退場判定、拖曳落位重排、流水帳觸發、記帳統計、備忘篩選、選題輪流、同步防護、模板匯出/匯入、store 整合流程）
 - **部署**: GitHub Pages (GitHub Actions CI/CD: build → upload-pages-artifact → deploy-pages)
 
 ---
@@ -142,6 +142,41 @@ npm run preview
 ```
 
 部署流程：push 至 `main` → GitHub Actions 自動 build → 部署至 GitHub Pages。
+
+---
+
+## 🚀 給他人部署：自建同款站點
+
+ Fork 本倉庫後依以下四步即可擁有自己的看板（以 GitHub 帳號 `YOURNAME` 為例）。
+
+### 1️⃣ Fork 並啟用 GitHub Pages
+1. 在倉庫頁面右上點 **Fork**，分叉到自己的帳號。
+2. 進入 Fork 倉庫 **Settings → Pages**，**Build and deployment / Source** 選 **GitHub Actions**。
+3. **Settings → Actions → General / Workflow permissions** 確認勾選 *Read and write permissions*（deploy-pages 需要）。
+
+### 2️⃣ 推觸 CI 自動部署
+推一次 `main`（任意 commit，或 Actions 頁 **Run workflow** 手動觸發）即自動完成 `npm ci → tsc + vite build → deploy-pages`。站點地址為 `https://YOURNAME.github.io/<倉庫名>/`——本專案使用 HashRouter + 相對 base path（`base: './'`），**任意倉庫名／子路徑都免改設定**。
+
+### 3️⃣（推薦）建自己的資料備份倉庫
+> ⚠️ 雲端同步目標目前於 `src/data/localStorageStore.ts` 內**硬編碼**為 `PosenChen/kanban-data`（共兩處 `api.github.com/repos/...`）。不改的話本地上傳會 403（無寫入權限），但**純 LocalStorage 模式不受影響**，可直接跳至步驟 4。
+
+1. 新建倉庫 `YOURNAME/kanban-data`（公開／私有皆可，私有需同帳號 Token）。
+2. 在該倉庫預先建好七個空資料檔：`data/projects.json`、`data/milestones.json`、`data/todos.json`、`data/routines.json`、`data/ledger.json`、`data/memos.json`、`data/topics.json`（內容各為 `[]`）。
+3. 把 `src/data/localStorageStore.ts` 中兩處 `PosenChen/kanban-data` 改為 `YOURNAME/kanban-data`，commit 推上 `main`。
+4. （選用）把 [PosenChen/kanban-data](https://github.com/PosenChen/kanban-data) 的 `.github/workflows/daily-backup.yml` 複製到你的資料倉庫，享每日快照保留 90 天；不用則刪，不影響主站。
+
+### 4️⃣ 啟用雲端同步（或使用純本地模式）
+1. 到 GitHub **Settings → Developer settings → Personal access tokens** 產生 Token：classic 勾 `repo` 範疇；或 fine-grained PAT 只授權 `kanban-data` 倉庫 **Contents: Read and write**。
+2. 開站 → **設定頁** 貼上 Token 並儲存 → 即可手動下載／上傳；切至雲端模式後，修改經 3 秒去抖自動上傳。
+3. **不用雲端也能用**：預設純 LocalStorage 模式，資料即時存瀏覽器；定期用設定頁 **匯出 JSON** 備份、**匯入 JSON** 還原。
+
+### ❓ 常見問題
+| 狀況 | 原因與解法 |
+|------|-----------|
+| CI build 失敗 | Actions 釘選 Node 20；本機請用 Node 20+ |
+| 雲端上傳 403 | Token 無 `kanban-data` 寫入權限，或忘記改步驟 3️⃣ 的硬編碼倉庫名 |
+| 雲端上傳 409 | 其他裝置先改過雲端——先到設定頁「下載」合併再上傳 |
+| Pages 404 | Source 未選 GitHub Actions，或 deploy job 尚未完成 |
 
 ---
 
@@ -362,6 +397,9 @@ npm run preview
 - 移除「優先級調色」勾選開關與「優先級（飽和度 高→低）：」引導文字——色塊／菱形**一律**依優先級調色（飽和度 100/72/45），飽和度圖例常顯
 - 連帶清除死代碼：`isColorByPriority()`／`STORAGE_KEY_COLOR_BY_PRIORITY`（舊 localStorage 值殘留無影響）
 
+### 🗓️ 20260910 — 文檔
+- README 新增「**給他人部署：自建同款站點**」章節：Fork → Pages 設定 → 自建 `kanban-data` 資料倉（含硬編碼改寫位置）→ Token 與純本地模式，附常見問題排錯表
+
 ---
 
 ## 🗺️ Roadmap
@@ -390,4 +428,4 @@ MIT
 
 ---
 
-*最後更新：2026-09-05*
+*最後更新：20260910*
