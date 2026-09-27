@@ -54,7 +54,7 @@
 - **樣式**: Tailwind CSS v4.3 (`@tailwindcss/vite`) + 自繪 SVG 甘特圖（不依賴 frappe-gantt 渲染元件）
 - **狀態管理**: React hooks (`useProjects`) + `kanban:data-change` CustomEvent 驅動重繪
 - **數據持久化**: LocalStorage + GitHub Content API (PosenChen/kanban-data)
-- **單元測試**: Vitest（19 test files / 102 tests：退場判定、拖曳落位重排、流水帳觸發、記帳統計、備忘篩選、選題輪流、新增待辦置頂、預設標籤、同步防護/跨裝置合併、模板匯出/匯入、store 整合流程）
+- **單元測試**: Vitest（18 test files / 102 tests：退場判定、拖曳落位重排、流水帳觸發、記帳統計、備忘篩選、選題輪流、新增待辦置頂、預設標籤、同步防護/跨裝置合併、模板匯出/匯入、store 整合流程）
 - **部署**: GitHub Pages (GitHub Actions CI/CD: build → upload-pages-artifact → deploy-pages)
 
 ---
