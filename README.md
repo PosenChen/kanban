@@ -6,9 +6,9 @@
 |------|------|
 | 🌐 **部署站點** | [posenchen.github.io/kanban](https://posenchen.github.io/kanban/) |
 | 📅 **專案啟動** | 2026-08-22 |
-| 🔄 **最新版本** | 2026-09-03 |
+| 🔄 **最新版本** | 2026-09-27 |
 | 📦 **技術架構** | React 19 + TypeScript 7 + Vite 8 + Tailwind CSS v4 |
-| 🧪 **單元測試** | Vitest（81 tests passed：退場判定、拖曳落位、記帳統計、備忘篩選、流水帳觸發比對、模板匯出/匯入、**同步空覆蓋防護/409衝突**、store 流程） |
+| 🧪 **單元測試** | Vitest（93 tests passed：退場判定、拖曳落位、記帳統計、備忘篩選、流水帳觸發比對、模板匯出/匯入、選題輪流、**同步空覆蓋防護/409衝突/跨裝置合併**、store 流程） |
 | 🐙 **原始碼** | [PosenChen/kanban](https://github.com/PosenChen/kanban) |
 | 📦 **資料備份倉庫** | [PosenChen/kanban-data](https://github.com/PosenChen/kanban-data)（`data/projects.json` / `milestones.json` / `todos.json` / `routines.json` / `ledger.json` / `memos.json` / `topics.json`） |
 
@@ -53,7 +53,7 @@
 - **樣式**: Tailwind CSS v4.3 (`@tailwindcss/vite`) + 自繪 SVG 甘特圖（不依賴 frappe-gantt 渲染元件）
 - **狀態管理**: React hooks (`useProjects`) + `kanban:data-change` CustomEvent 驅動重繪
 - **數據持久化**: LocalStorage + GitHub Content API (PosenChen/kanban-data)
-- **單元測試**: Vitest（14 test files / 81 tests：退場判定、拖曳落位重排、流水帳觸發、記帳統計、備忘篩選、選題輪流、同步防護、模板匯出/匯入、store 整合流程）
+- **單元測試**: Vitest（16 test files / 93 tests：退場判定、拖曳落位重排、流水帳觸發、記帳統計、備忘篩選、選題輪流、同步防護/跨裝置合併、模板匯出/匯入、store 整合流程）
 - **部署**: GitHub Pages (GitHub Actions CI/CD: build → upload-pages-artifact → deploy-pages)
 
 ---
@@ -64,22 +64,25 @@
 kanban/
 ├── index.html                # 入口（含 pre-paint 主題腳本，防暗色模式閃白）
 ├── package.json
-├── vite.config.ts            # codeSplitting: false + @ src alias
+├── vite.config.ts            # codeSplitting: false + @ src alias + 相對 base path（任意子路徑部署）
 ├── tsconfig.json
 ├── requirements.md           # 需求規格書 + Roadmap
-├── .github/workflows/deploy.yml  # GitHub Actions CI/CD
-├── dist/                     # 構建輸出（供靜態部署參考）
+├── .github/workflows/deploy.yml  # GitHub Actions CI/CD（Node 20 + npm ci → build → Pages）
 └── src/
-    ├── App.tsx               # 主應用路由（/ /board /project/:id /daily/:date? /ledger /memo /archive /settings）+ 全域 ThemeToggle
+    ├── App.tsx               # 主應用路由（/ /board /project/:id /daily/:date? /ledger /memo /topics /archive /settings）+ 全域 ThemeToggle
+    ├── main.tsx
     ├── types/
-    │   └── project.ts        # 資料型別 (Project, Milestone, Todo, Routine, LedgerEntry, Memo, ProjectTemplate) + 狀態/優先級設定
+    │   └── project.ts        # 資料型別 (Project, Milestone, Todo, Routine, LedgerEntry, Memo, Topic, ProjectTemplate) + 狀態/優先級設定
     ├── data/
-    │   ├── localStorageStore.ts  # 資料持久化（LocalStorage + GitHub API 同步 + migration + 模板匯入 + 自動退場）
+    │   ├── localStorageStore.ts  # Unified store：LocalStorage + GitHub API 同步（mergeById 合併/自動推送安全門）+ migration + 模板匯入 + 自動退場
+    │   ├── sampleData.ts         # 示範資料（僅首次載入 seed；初始化期不自動推送上雲）
     │   ├── store.archive.test.ts # store 退場流程整合測試（1 test）
     │   ├── store.reorder.test.ts # store 拖曳落位測試（6 tests）
     │   ├── store.ledger.test.ts  # store 記帳 CRUD 測試（2 tests）
     │   ├── store.memo.test.ts    # store 備忘 CRUD 測試（2 tests）
-    │   └── sampleData.ts       # 示範資料
+    │   ├── store.topic.test.ts   # store 選題 CRUD/輪流測試（4 tests）
+    │   ├── store.syncguard.test.ts # store 同步防護：空覆蓋跳過/上傳/409（4 tests）
+    │   └── store.crossdevice.test.ts # store 跨裝置合併（雙裝置 mock，相對日期，3 tests）
     ├── hooks/
     │   ├── useProjects.ts      # React hook wrapper（暴露 store CRUD/排序方法）
     │   └── useDragReorder.ts   # 列表拖曳共用狀態機（插入線/幽靈/落位）
@@ -91,34 +94,38 @@ kanban/
     │   ├── archiveUtils.ts        # 退場判定純函式（個別物件 / 父＋子孫群組，門檻日數）
     │   ├── archiveUtils.test.ts    # 退場判定單元測試（16 tests）
     │   ├── reorderUtils.ts      # 拖曳落位純函式（reorderToSlot/nextIdAfter）
-    │   ├── reorderUtils.test.ts    # 落位單元測試（14 tests）
+    │   ├── reorderUtils.test.ts    # 落位單元測試（8 tests）
     │   ├── ledgerUtils.ts       # 記帳月比對／round2／分類統計
     │   ├── ledgerUtils.test.ts     # 記帳單元測試（5 tests）
     │   ├── memoUtils.ts         # 備忘篩選純函式（關鍵字/標籤/置頂排序）
     │   ├── memoUtils.test.ts       # 備忘單元測試（5 tests）
     │   ├── topicUtils.ts          # 選題輪流純函式（todayTopic/領題/交卷/調序/重排）
     │   ├── topicUtils.test.ts       # 選題單元測試（7 tests）
-    │   ├── exportUtils.ts      # 專案模板組裝/匯出 + Word HTML builder
-    │   └── exportUtils.test.ts     # 模板單元測試（5 tests）
+    │   ├── exportUtils.ts      # 專案模板組裝/匯出 + 日期重錨定 + Word HTML builder
+    │   ├── exportUtils.test.ts     # 模板單元測試（5 tests）
+    │   ├── syncGuardUtils.ts   # 同步防護純函式（空覆蓋跳過/計畫/mergeById 合併/差異偵測/筆數摘要）
+    │   ├── syncGuardUtils.test.ts  # 同步防護單元測試（7 tests）
+    │   └── syncMerge.test.ts   # 跨裝置 mergeById 合併單測（9 tests）
     ├── components/
     │   ├── FilterBar.tsx       # 搜尋/篩選列
     │   ├── ProjectCard.tsx     # 看板卡片
     │   ├── ProjectForm.tsx     # 專案表單
-    │   └── ThemeToggle.tsx     # 深/浅主題浮動切換鈕
+    │   └── ThemeToggle.tsx     # 深/淺主題浮動切換鈕
     ├── layouts/
     │   └── MainLayout.tsx      # 導航列
-    ├── pages/
-    │   ├── GanttPage.tsx       # 甘特圖總覽頁（~1840 行：凍結側欄/SVG 渲染/拖曳編輯/拖曳排序/活動與待辦 CRUD）
-    │   ├── KanbanBoard.tsx     # 看板頁面（四欄）
-    │   ├── DailyPage.tsx       # 日曆詳細頁（響應式三欄）
-    │   ├── ProjectDetailPage.tsx  # 專案詳細頁（含返回父專案）
-    │   ├── LedgerPage.tsx      # 記帳頁（/ledger：收支＋月度統計）
-    │   ├── MemoPage.tsx        # 備忘錄頁（/memo：便條＋搜尋＋標籤＋📌 置頂）
-    │   ├── TopicsPage.tsx      # 選題庫頁（/topics：今日題大卡＋輪流池＋交卷統計）
-    │   ├── ArchivePage.tsx     # 檔案庫頁（/archive：按月分組、還原／永久刪除）
-    │   └── SettingsPage.tsx    # 設定與同步（含退場門檻日數）
-    └── main.tsx
+    └── pages/
+        ├── GanttPage.tsx       # 甘特圖總覽頁（凍結側欄/SVG 渲染/拖曳編輯/拖曳排序/活動與待辦 CRUD）
+        ├── KanbanBoard.tsx     # 看板頁面（四欄）
+        ├── DailyPage.tsx       # 日曆詳細頁（響應式三欄）
+        ├── ProjectDetailPage.tsx  # 專案詳細頁（含返回父專案）
+        ├── LedgerPage.tsx      # 記帳頁（/ledger：收支＋月度統計）
+        ├── MemoPage.tsx        # 備忘錄頁（/memo：便條＋搜尋＋標籤＋📌 置頂）
+        ├── TopicsPage.tsx      # 選題庫頁（/topics：今日題大卡＋輪流池＋交卷統計）
+        ├── ArchivePage.tsx     # 檔案庫頁（/archive：按月分組、還原／永久刪除）
+        └── SettingsPage.tsx    # 設定與同步（含退場門檻日數、雲端/本地模式）
 ```
+
+> 構建輸出 `dist/` 不入庫：CI 每次 build 重新產生（`.gitignore` 排除），GitHub Pages 由 Actions 直接部署，本地 `npm run build` 即可預覽。
 
 ---
 
@@ -182,10 +189,11 @@ npm run preview
 
 ## 🔄 數據同步
 
-- **LocalStorage**: 預設使用瀏覽器本地儲存（keys: `kanban_projects` / `kanban_milestones` / `kanban_todos` / `kanban_routines` / `kanban_ledger` / `kanban_memos`），所有修改即時生效
+- **LocalStorage**: 預設使用瀏覽器本地儲存（keys: `kanban_projects` / `kanban_milestones` / `kanban_todos` / `kanban_routines` / `kanban_ledger` / `kanban_memos` / `kanban_topics`），所有修改即時生效
 - **GitHub API**: 在設定頁填入 Personal Access Token 後可啟用雲端同步
   - 手動下載：從 `PosenChen/kanban-data` 拉取最新資料（`kanban_storage_source = "github"` 時啟用）
   - 自動上傳：修改後 3 秒去抖自動同步至 GitHub
+  - 自動下載合併：開站／切回視窗／visibilitychange 自動拉取（節流 30s），七類資料依 `mergeById()` 合併——同 ID 以 `updated_at` 新者勝出（tie 留本地），故其他裝置的待辦勾選／流水帳打勾／專案進度能跨裝置刷新
   - 七個資料檔：`data/projects.json`、`data/milestones.json`、`data/todos.json`、`data/routines.json`、`data/ledger.json`、`data/memos.json`、`data/topics.json`
 - **載入時自動遷移**: 舊格式 `date` 自動轉為 `start_date`/`end_date`；缺失或重複的 `sort_order` 自動重排為連續值
 - **自動退場**: 載入時執行 `autoArchive()` —— 已完成且逾期 ≥ `kanban_archive_days`（預設 14 天）的物件打上 `archived_at` 標記退場至檔案庫；專案採**群組規則**（父與全部子孫都完成、以最晚結束日計），只標記、絕不刪除
@@ -407,6 +415,14 @@ npm run preview
 - **自動下載**：開站／視窗 focus／visibilitychange 自動拉取合併（節流 30s；409 衝突立即 force 拉取）；拉取期間的本地修改記帳補推，不漏勾選
 - 設定頁同步狀態顯示目前模式（雲端/本地）；新回歸測試：`syncMerge.test.ts` 9 + `store.crossdevice.test.ts` 3（雙裝置情境 mock）— 全數 **93 tests passed**
 
+### 🗓️ 20260927 — 自動推送安全門（封死樣本污染雲端）
+
+- **根因**：`scheduleGitHubSync()` 在模組求值期即被 migration／`autoArchive()`→`emit` 觸發——**全新裝置第一次開站、尚未做任何修改**，就把預設樣本資料推到雲端，污染共用倉庫
+- **修正（多重安全門）**：`scheduleGitHubSync()` 新增五道非 force 闸门——① `initializing`（開站落地期 seed/migration/autoArchive 不推，落地完成才放開）② `_isBrowser`（node／Vitest 測試環境不觸網）③ `autoPulling`（拉取中不推，拉取後由 `lastPullHadLocalChanges` 差異偵測接手補推）④ `crossTabReload`（同瀏覽器他頁變更只刷 UI、不重複推）⑤ 純本地模式不自動推（手動上傳按鈕不受限）；force 可跳過全部
+- **409 自愈**：推送遇衝突（其他裝置先改）→ 自動 `autoPullIfCloud(true)` 下載合併，本地保持最新，下次修改自然回推，不再卡死衝突
+- 工程：雙裝置回歸測試改採**相對日期** fixture（原固定 `2026-09-10` 時間戳隨時間推進跨過 14 天退場門檻、被 `autoArchive()` 標記後從 `getTodos()` 過濾掉，是枚 flaky 時間炸彈）— 全數 **93 tests passed**
+- 工程：`git rm --cached node_modules`（3,589 檔）+ `.DS_Store` 取消追蹤——CI 已用 `npm ci`，追蹤的 `node_modules` 純膨脹且與部署指引相衝，避免每個 Fork 繼承數千無用檔案
+
 ---
 
 ## 🗺️ Roadmap
@@ -435,4 +451,4 @@ MIT
 
 ---
 
-*最後更新：20260910*
+*最後更新：20260927*
