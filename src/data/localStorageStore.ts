@@ -816,17 +816,20 @@ export const projectStore = {
 
   // ── Todo CRUD ──
 
+  // 新增待辦預設置頂：新項取最小 sort_order，其餘順序 +1 重新編號，
+  // 維持 0..N-1 連續序列（避免重編號跳洞/重複破壞拖曳落位）。
   addTodo(data: Omit<Todo, 'id' | 'created_at' | 'updated_at' | 'sort_order'>): Todo {
     const now = new Date().toISOString()
-    const sortOrder = todos.length
     const newTodo: Todo = {
       ...data,
-      sort_order: sortOrder,
-      id: `t${Date.now().toString(36)}`,
+      sort_order: 0,
+      id: `t${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`,
       created_at: now,
       updated_at: now,
     }
-    todos = [...todos, newTodo]
+    // 新項放最前，既有項 sort_order 全 +1（順序不變，只下移）
+    const shifted = todos.map(t => ({ ...t, sort_order: (t.sort_order ?? 0) + 1 }))
+    todos = [newTodo, ...shifted]
     saveTodos(todos)
     emitTodoChange()
     return newTodo
