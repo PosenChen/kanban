@@ -1,3 +1,5 @@
+> 📖 語言：[English](README.en.md) · [简体中文](README.zh-CN.md) · **繁體中文**
+
 # 個人專案管理看板 (Kanban Project Board)
 
 一個開源的個人專案管理工具，結合 **甘特圖（Gantt Chart）**、**看板（Kanban Board）**、**日曆視圖** 與 **待辦管理**，助力個人專案規劃與追蹤。
