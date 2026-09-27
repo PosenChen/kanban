@@ -2,12 +2,72 @@ import { useState, useEffect, useCallback } from 'react'
 import { projectStore, scheduleGitHubSync, getSyncStatus, getStorageSource, setStorageSource, getArchiveDays, pushToGitHub, getLocalCounts, fetchRemoteCounts, type SyncEventDetail } from '@/data/localStorageStore'
 import { formatCountSummary } from '@/utils/syncGuardUtils'
 import { isProjectTemplate } from '@/utils/exportUtils'
+import { getTagPresets, setTagPresets, resetTagPreset, cleanTags, TAG_PRESET_LABELS, type TagPresets, type TagPresetKey } from '@/utils/tagPresets'
+
+// 單一類別的可編輯標籤編輯器：pill + ✕、輸入加 Enter 新增、可還原預設
+function TagEditor({ label, tags, accent, onAdd, onRemove, onReset }: {
+  label: string
+  tags: string[]
+  accent: string
+  onAdd: (t: string) => void
+  onRemove: (t: string) => void
+  onReset: () => void
+}) {
+  const [draft, setDraft] = useState('')
+  const add = () => { const t = draft.trim(); if (t) { onAdd(t); setDraft('') } }
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{label}</span>
+        <button onClick={onReset} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">↺ 還原預設</button>
+      </div>
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {tags.length === 0 && <span className="text-xs text-gray-400">（無——加一個）</span>}
+        {tags.map(t => (
+          <span key={t} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${accent}`}>
+            {t}
+            <button onClick={() => onRemove(t)} className="hover:text-red-500" title="移除">×</button>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
+          placeholder="新增後按 Enter"
+          className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+        <button onClick={add} className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">＋</button>
+      </div>
+    </div>
+  )
+}
 
 function SettingsPage() {
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'loading' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
   const [syncInfo, setSyncInfo] = useState({ hasToken: false })
   const [archiveDays] = useState(() => getArchiveDays())
+  // 預設標籤（各表單快速點選的候選）：本地設定，改完即生效
+  const [presets, setPresets] = useState<TagPresets>(() => getTagPresets())
+
+  const updatePreset = (key: TagPresetKey, next: string[]) => {
+    const p = { ...presets, [key]: cleanTags(next) }
+    setPresets(p)
+    setTagPresets(p)
+  }
+  const addPresetTag = (key: TagPresetKey, t: string) => {
+    if (!t.trim() || presets[key].includes(t.trim())) return
+    updatePreset(key, [...presets[key], t.trim()])
+  }
+  const removePresetTag = (key: TagPresetKey, t: string) =>
+    updatePreset(key, presets[key].filter(x => x !== t))
+  const resetPreset = (key: TagPresetKey) => {
+    const p = resetTagPreset(key, presets)
+    setPresets(p)
+    setTagPresets(p)
+  }
 
   useEffect(() => {
     setSyncInfo(getSyncStatus())
@@ -189,7 +249,7 @@ function SettingsPage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6">
       <button onClick={() => window.history.back()} className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200">
         ← 返回
       </button>
@@ -307,6 +367,38 @@ function SettingsPage() {
             <span>天自動退入檔案庫（總覽不再顯示，資料保留）</span>
           </div>
           <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">父專案連同全部子專案一併退場；可在檔案庫隨時還原。</p>
+        </div>
+
+        {/* 預設標籤（可編輯快速點選候選） */}
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">🏷️ 預設標籤</h3>
+            <p className="text-xs text-gray-400 dark:text-gray-500">各表單「快速點選」時的候選。新增／移除即生效（下次開啟對應表單），存於本機、不上雲端。</p>
+          </div>
+          <TagEditor label={TAG_PRESET_LABELS.project} tags={presets.project}
+            accent="bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+            onAdd={t => addPresetTag('project', t)} onRemove={t => removePresetTag('project', t)} onReset={() => resetPreset('project')} />
+          <TagEditor label={TAG_PRESET_LABELS.ledger} tags={presets.ledger}
+            accent="bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300"
+            onAdd={t => addPresetTag('ledger', t)} onRemove={t => removePresetTag('ledger', t)} onReset={() => resetPreset('ledger')} />
+          <TagEditor label={TAG_PRESET_LABELS.memo} tags={presets.memo}
+            accent="bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300"
+            onAdd={t => addPresetTag('memo', t)} onRemove={t => removePresetTag('memo', t)} onReset={() => resetPreset('memo')} />
+          <TagEditor label={TAG_PRESET_LABELS.topic} tags={presets.topic}
+            accent="bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+            onAdd={t => addPresetTag('topic', t)} onRemove={t => removePresetTag('topic', t)} onReset={() => resetPreset('topic')} />
+        </div>
+
+        {/* 看板可設定選項參考 */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">⚙️ 可設定選項</h3>
+          <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1.5">
+            <li><strong className="text-gray-600 dark:text-gray-300">🏷️ 預設標籤</strong>：本頁上方，專案／活動、記帳、備忘、選題各一組快速標籤</li>
+            <li><strong className="text-gray-600 dark:text-gray-300">🗂️ 自動退場天數</strong>：上方欄位，完成逾 N 天退入檔案庫</li>
+            <li><strong className="text-gray-600 dark:text-gray-300">🌓 深淺主題</strong>：右下角浮動切換鈕（light / dark / 跟隨系統），自動記憶</li>
+            <li><strong className="text-gray-600 dark:text-gray-300">📡 雲端同步模式</strong>：本頁上方，LocalStorage ↔ GitHub 一鍵切換</li>
+          </ul>
+          <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">甘特圖色塊一律依「優先級飽和度」自動調色（高/中/低），無須手動設定。</p>
         </div>
 
         {/* 使用說明 */}

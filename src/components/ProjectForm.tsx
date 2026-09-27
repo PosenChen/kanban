@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { STATUS_CONFIG, QUICK_TAGS, type Project, type ProjectStatus } from '@/types/project'
+import { STATUS_CONFIG, type Project, type ProjectStatus } from '@/types/project'
 import { PRIORITY_CONFIG } from '@/types/project'
 import { getRemainingDays, getDaysDiff } from '@/utils/dateUtils'
+import { getTagPresets } from '@/utils/tagPresets'
 
 interface ProjectFormProps {
   onClose: () => void
@@ -22,6 +23,8 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects, defaultStar
   const [priority, setPriority] = useState<'high' | 'medium' | 'low'>(editProject?.priority || 'medium')
   const [tagInput, setTagInput] = useState('')
   const [tags, setTags] = useState<string[]>(editProject?.tags || [])
+  // 專案快速標籤：讀取設定頁可編輯的預設（每次開啟重新讀，改完即生效）
+  const [quickTags] = useState<string[]>(() => getTagPresets().project)
 
   const allRoots = rootProjects.map(r => ({ value: r.id, label: r.name }))
 
@@ -194,9 +197,9 @@ function ProjectForm({ onClose, onSubmit, editProject, rootProjects, defaultStar
                 新增
               </button>
             </div>
-            {/* Quick-pick tag buttons */}
+            {/* Quick-pick tag buttons（依設定頁預設標籤） */}
             <div className="flex flex-wrap gap-1 mt-2">
-              {QUICK_TAGS.map(tag => (
+              {quickTags.map(tag => (
                 <button
                   key={tag}
                   type="button"

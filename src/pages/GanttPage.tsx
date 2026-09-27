@@ -2,7 +2,8 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
 import { projectStore, setStorageSource } from '@/data/localStorageStore'
-import { STATUS_CONFIG, QUICK_TAGS, WEEKDAY_LABELS, type Project, type Milestone, type Todo, type ProjectPriority, type Routine } from '@/types/project'
+import { STATUS_CONFIG, WEEKDAY_LABELS, type Project, type Milestone, type Todo, type ProjectPriority, type Routine } from '@/types/project'
+import { getTagPresets } from '@/utils/tagPresets'
 import { dateToStr } from '@/utils/dateUtils'
 import { getActiveRoutines, isDoneToday, todayStr } from '@/utils/routineUtils'
 import { nextIdAfter } from '@/utils/reorderUtils'
@@ -269,6 +270,8 @@ function GanttPage() {
   const [rMonthDays, setRMonthDays] = useState('')
   const [rTags, setRTags] = useState<string[]>([])
   const [rCustomTag, setRCustomTag] = useState('')
+  // 專案／活動／流水帳共用的「快速標籤」：讀取設定頁可編輯的預設
+  const [presetProjectTags] = useState<string[]>(() => getTagPresets().project)
 
   const today = todayStr()
 
@@ -917,9 +920,10 @@ function GanttPage() {
               className="flex items-center gap-1 px-2 md:px-3 py-1.5 md:py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm font-medium border border-green-600 transition-colors"
             >
               <svg className="hidden md:block w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              同步
+              設定
             </button>
             <button
               onClick={handleLoadFromGitHub}
@@ -1494,7 +1498,7 @@ function GanttPage() {
                 />
                 {/* Quick-pick tag buttons */}
                 <div className="flex flex-wrap gap-1 mt-2">
-                  {QUICK_TAGS.map(tag => (
+                  {presetProjectTags.map(tag => (
                     <button
                       key={tag}
                       type="button"
@@ -1753,7 +1757,7 @@ function GanttPage() {
                     <div>
                       <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">今日活動含以下標籤時出現</label>
                       <div className="flex flex-wrap gap-1 mb-1">
-                        {QUICK_TAGS.map(t => (
+                        {presetProjectTags.map(t => (
                           <button
                             key={t}
                             type="button"
@@ -1763,7 +1767,7 @@ function GanttPage() {
                             {t}
                           </button>
                         ))}
-                        {rTags.filter(t => !QUICK_TAGS.includes(t)).map(t => (
+                        {rTags.filter(t => !presetProjectTags.includes(t)).map(t => (
                           <button
                             key={t}
                             type="button"

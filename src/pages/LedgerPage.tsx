@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { projectStore } from '@/data/localStorageStore'
-import { LEDGER_KIND_LABELS, LEDGER_QUICK_CATEGORIES, type LedgerEntry, type LedgerKind } from '@/types/project'
+import { LEDGER_KIND_LABELS, type LedgerEntry, type LedgerKind } from '@/types/project'
 import { dateToStr } from '@/utils/dateUtils'
+import { getTagPresets } from '@/utils/tagPresets'
 import { monthKeyOf, sumMonth, categoryBreakdown, round2 } from '@/utils/ledgerUtils'
 
 const fmt = (n: number) => `$${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
@@ -17,6 +18,8 @@ function LedgerPage() {
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('')
   const [note, setNote] = useState('')
+  // 記帳快速類別：讀取設定頁可編輯的預設（切換頁面會重載，改完即生效）
+  const [ledgerCats] = useState<string[]>(() => getTagPresets().ledger)
 
   useEffect(() => {
     const h = (e: Event) => {
@@ -153,7 +156,7 @@ function LedgerPage() {
             <input type="text" value={category} onChange={e => setCategory(e.target.value)} placeholder="如 餐飲"
               className="w-full mb-2 px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm text-gray-800 dark:text-gray-100" />
             <div className="flex flex-wrap gap-1 mb-3">
-              {LEDGER_QUICK_CATEGORIES.map(c => (
+              {ledgerCats.map(c => (
                 <button key={c} onClick={() => setCategory(c)}
                   className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${category === c ? 'bg-teal-500 text-white border-teal-500' : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-teal-400'}`}>
                   {c}

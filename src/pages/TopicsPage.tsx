@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { projectStore } from '@/data/localStorageStore'
-import { TOPIC_QUICK_TAGS, TOPIC_STATUS_LABELS, type Topic } from '@/types/project'
+import { TOPIC_STATUS_LABELS, type Topic } from '@/types/project'
 import { dateToStr } from '@/utils/dateUtils'
 import { monthlyDoneCount, todayTopic } from '@/utils/topicUtils'
+import { getTagPresets } from '@/utils/tagPresets'
 
 function TopicsPage() {
   const [topics, setTopics] = useState<Topic[]>(() => projectStore.getTopics())
@@ -12,6 +13,8 @@ function TopicsPage() {
   const [title, setTitle] = useState('')
   const [outline, setOutline] = useState('')
   const [formTags, setFormTags] = useState<string[]>([])
+  // 選題快速標籤：讀取設定頁可編輯的預設（切換頁面會重載，改完即生效）
+  const [topicQuickTags] = useState<string[]>(() => getTagPresets().topic)
 
   useEffect(() => {
     const h = (e: Event) => {
@@ -155,7 +158,7 @@ function TopicsPage() {
               className="w-full mb-3 px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm text-gray-800 dark:text-gray-100 resize-y" />
             <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">標籤</label>
             <div className="flex flex-wrap gap-1 mb-4">
-              {TOPIC_QUICK_TAGS.map(t => (
+              {topicQuickTags.map(t => (
                 <button key={t} onClick={() => toggleFormTag(t)}
                   className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${formTags.includes(t) ? 'bg-indigo-500 text-white border-indigo-500' : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-indigo-400'}`}>
                   {t}

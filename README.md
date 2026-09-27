@@ -8,7 +8,7 @@
 | 📅 **專案啟動** | 2026-08-22 |
 | 🔄 **最新版本** | 2026-09-27 |
 | 📦 **技術架構** | React 19 + TypeScript 7 + Vite 8 + Tailwind CSS v4 |
-| 🧪 **單元測試** | Vitest（96 tests passed：退場判定、拖曳落位、記帳統計、備忘篩選、流水帳觸發比對、模板匯出/匯入、選題輪流、新增待辦置頂、**同步空覆蓋防護/409衝突/跨裝置合併**、store 流程） |
+| 🧪 **單元測試** | Vitest（102 tests passed：退場判定、拖曳落位、記帳統計、備忘篩選、流水帳觸發比對、模板匯出/匯入、選題輪流、新增待辦置頂、**預設標籤設定/同步空覆蓋防護/409衝突/跨裝置合併**、store 流程） |
 | 🐙 **原始碼** | [PosenChen/kanban](https://github.com/PosenChen/kanban) |
 | 📦 **資料備份倉庫** | [PosenChen/kanban-data](https://github.com/PosenChen/kanban-data)（`data/projects.json` / `milestones.json` / `todos.json` / `routines.json` / `ledger.json` / `memos.json` / `topics.json`） |
 
@@ -39,6 +39,7 @@
 | **選題庫（每日一文）** | `/topics` 主題池 FIFO 輪流：「今日題」大卡自動舉題（未交卷明日黏住同題），✍️ 領題 → ✅ 交卷、▲▼ 調序、本月交卷統計、CRUD + GitHub 同步（`topics.json`） |
 | **展開狀態持久化** | 甘特圖父子專案展開/收合狀態存入 `localStorage`，跨頁與重載保持 |
 | **深色模式** | Tailwind v4 class-based 暗色主題，light/dark/system 三檔切換，浮動切換鈕，pre-paint 防閃白 |
+| **預設標籤（快速選取）** | 設定頁 🏷️ 可編輯各表單快速點選的候選：專案／活動（甘特圖）、記帳、備忘、選題各一組；增刪即生效、可一鍵還原預設，存本機 `kanban_tag_presets`、不上雲端 |
 | **數據同步** | LocalStorage 本地儲存 + GitHub API 雲端備份；**自動上傳**（3 秒去抖）＋**自動下載合併**（開站／切回視窗節流 30s）＋手動下載/上傳 |
 | **同步防護（防誤覆蓋）** | 本地空＋雲端非空 → **自動跳過上傳**（絕不把雲端清空）；sha 衝突偵測（其他裝置先改 → 409 中止並提示先下載合併）；手動上傳前確認框顯示**本地/雲端六檔筆數比對**；上傳失敗如實報錯；`kanban-data` 倉庫 Actions **每日快照** `backups/YYYYMMDD/` 保留 90 天 |
 | **資料備份/還原** | JSON 匯出/匯入，完整備份專案、活動與待辦 |
@@ -53,7 +54,7 @@
 - **樣式**: Tailwind CSS v4.3 (`@tailwindcss/vite`) + 自繪 SVG 甘特圖（不依賴 frappe-gantt 渲染元件）
 - **狀態管理**: React hooks (`useProjects`) + `kanban:data-change` CustomEvent 驅動重繪
 - **數據持久化**: LocalStorage + GitHub Content API (PosenChen/kanban-data)
-- **單元測試**: Vitest（17 test files / 96 tests：退場判定、拖曳落位重排、流水帳觸發、記帳統計、備忘篩選、選題輪流、新增待辦置頂、同步防護/跨裝置合併、模板匯出/匯入、store 整合流程）
+- **單元測試**: Vitest（19 test files / 102 tests：退場判定、拖曳落位重排、流水帳觸發、記帳統計、備忘篩選、選題輪流、新增待辦置頂、預設標籤、同步防護/跨裝置合併、模板匯出/匯入、store 整合流程）
 - **部署**: GitHub Pages (GitHub Actions CI/CD: build → upload-pages-artifact → deploy-pages)
 
 ---
@@ -106,7 +107,9 @@ kanban/
     │   ├── exportUtils.test.ts     # 模板單元測試（5 tests）
     │   ├── syncGuardUtils.ts   # 同步防護純函式（空覆蓋跳過/計畫/mergeById 合併/差異偵測/筆數摘要）
     │   ├── syncGuardUtils.test.ts  # 同步防護單元測試（7 tests）
-    │   └── syncMerge.test.ts   # 跨裝置 mergeById 合併單測（9 tests）
+    │   ├── syncMerge.test.ts   # 跨裝置 mergeById 合併單測（9 tests）
+    │   ├── tagPresets.ts       # 預設標籤（快速選取）設定：get/set/reset/clean，存 kanban_tag_presets
+    │   └── tagPresets.test.ts  # 預設標籤單元測試（6 tests）
     ├── components/
     │   ├── FilterBar.tsx       # 搜尋/篩選列
     │   ├── ProjectCard.tsx     # 看板卡片
@@ -429,6 +432,14 @@ npm run preview
 - `addTodo` 改為新項取最小 `sort_order`、其餘下移重編號（0..N-1 連續）——新增／複製的待辦預設顯示在待辦清單**最上面**（原為追加到最下面）
 - 連帶修 `addTodo` id 防撞：`Date.now()+random`（同 `copyProject` 模式），避免同毫秒連按新增／複製產生同 id、跨裝置合併時兩筆摺成一首
 - 工程：新增 `store.todo.test.ts`（3 tests）— 全數 **96 tests passed**
+
+### 🗓️ 20260927 — 設定頁：預設標籤編輯 + 甘特圖入口改名
+
+- **甘特圖工具列「同步」→「設定」**：原按鈕本就導航 `/settings`（含手動同步），改名「設定」並換齒輪圖示，語意更準（避免「下載 GitHub」與「設定」並列時誤以為「同步」是手動同步動作）
+- **預設標籤（quick-pick）改為可設定**：新增 `utils/tagPresets.ts`——`TagPresets`（`project` 專案／活動／流水帳共用、`ledger`、`memo`、`topic`）存 `localStorage['kanban_tag_presets']`，預設沿用原 `QUICK_TAGS`/`LEDGER_QUICK_CATEGORIES`/`MEMO_QUICK_TAGS`/`TOPIC_QUICK_TAGS` 常數（行為不變）；`getTagPresets()/setTagPresets()/resetTagPreset()/cleanTags()`（去空白＋去重，TDD 6）
+- **五處表單改讀設定**：`ProjectForm`、GanttPage（活動＋流水帳）、`LedgerPage`、`MemoPage`、`TopicsPage` 的快速標籤改為讀 `getTagPresets()` 對應類別（每次開啟表單重新讀，改完即生效）
+- **設定頁新增「🏷️ 預設標籤」**：四組可編輯標籤（pill＋✕ 移除、輸入＋Enter 新增、↺ 還原預設），另加「⚙️ 可設定選項」參考（預設標籤／自動退場天數／深淺主題／雲端同步模式；說明甘特圖色塊依優先級自動調色）
+- 工程：`tagPresets.test.ts`（6 tests）— 全數 **102 tests passed**
 
 ---
 

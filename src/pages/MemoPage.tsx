@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { projectStore } from '@/data/localStorageStore'
-import { MEMO_QUICK_TAGS, type Memo } from '@/types/project'
+import { type Memo } from '@/types/project'
 import { dateToStr } from '@/utils/dateUtils'
 import { filterMemos } from '@/utils/memoUtils'
+import { getTagPresets } from '@/utils/tagPresets'
 
 const SNIPPET = 80
 
@@ -17,6 +18,8 @@ function MemoPage() {
   const [content, setContent] = useState('')
   const [date, setDate] = useState(() => dateToStr(new Date()))
   const [formTags, setFormTags] = useState<string[]>([])
+  // 備忘快速標籤：讀取設定頁可編輯的預設（切換頁面會重載，改完即生效）
+  const [memoQuickTags] = useState<string[]>(() => getTagPresets().memo)
 
   useEffect(() => {
     const h = (e: Event) => {
@@ -142,7 +145,7 @@ function MemoPage() {
               className="w-full mb-3 px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm text-gray-800 dark:text-gray-100" />
             <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">標籤</label>
             <div className="flex flex-wrap gap-1 mb-4">
-              {MEMO_QUICK_TAGS.map(t => (
+              {memoQuickTags.map(t => (
                 <button key={t} onClick={() => toggleFormTag(t)}
                   className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${formTags.includes(t) ? 'bg-teal-500 text-white border-teal-500' : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-teal-400'}`}>
                   {t}
